@@ -20,6 +20,9 @@
   <!-- SweetAlert2 CDN -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
+  <!-- Supabase JS Client CDN (ক্লাউড ডেটাবেজ সিঙ্ক্রোনাইজেশন) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
   <!-- Custom Stylesheet -->
   <link rel="stylesheet" href="style.css">
   
@@ -2045,6 +2048,9 @@ window.CAF_LOGO_DATA_URI = "assets/logo.png";
           <button onclick="switchAdminModule('notice')" id="adm-mod-notice" class="adm-tab-pill">
             <i class="fa-solid fa-bullhorn text-rose-600"></i> ৬. নোটিশ বোর্ড
           </button>
+          <button onclick="switchAdminModule('cloud')" id="adm-mod-cloud" class="adm-tab-pill">
+            <i class="fa-solid fa-cloud text-sky-500"></i> ৭. ক্লাউড ডেটাবেজ
+          </button>
         </div>
 
         <!-- 1. Donors Table Container -->
@@ -2193,6 +2199,127 @@ window.CAF_LOGO_DATA_URI = "assets/logo.png";
               </tbody>
             </table>
           </div>
+        </div>
+
+        <!-- 7. Supabase Cloud Database Management Box -->
+        <div id="adm-box-cloud" class="admin-module-box bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden hidden space-y-6 p-6 sm:p-8">
+          
+          <!-- Cloud Header & Live Status -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+            <div class="flex items-center gap-3">
+              <span class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 border border-sky-200 flex items-center justify-center text-2xl shadow-sm">
+                <i class="fa-solid fa-cloud"></i>
+              </span>
+              <div>
+                <h3 class="font-black text-slate-900 text-lg sm:text-xl">Supabase ক্লাউড ডেটাবেজ নিয়ন্ত্রণ কেন্দ্র</h3>
+                <p class="text-xs text-slate-500 mt-0.5">সব ডিভাইস, মোবাইল ও ব্রাউজারে একই ডেটা রিয়েলটাইম সিঙ্ক্রোনাইজেশন</p>
+              </div>
+            </div>
+            <div id="cloud-status-badge" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-sm">
+              <i class="fa-solid fa-circle-dot text-amber-500 animate-pulse"></i>
+              <span>সংযোগ অবস্থা যাচাই করা হচ্ছে...</span>
+            </div>
+          </div>
+
+          <!-- Cloud Connection Configuration Card -->
+          <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-3xl shadow-xl border border-slate-700/80 space-y-5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-sky-400 bg-sky-950/80 px-3 py-1 rounded-full border border-sky-800">
+                <i class="fa-solid fa-key mr-1"></i> API Credentials (নিরাপদ ফ্রন্টএন্ড কানেকশন)
+              </span>
+              <span class="text-[11px] text-slate-400">Cloudflare Pages সামঞ্জস্যপূর্ণ</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label class="block font-bold text-slate-300 mb-1">
+                  Supabase Project URL <span class="text-rose-400">*</span>
+                </label>
+                <input type="text" id="supabase-url-input" value="https://evnqybxfdzrvormdyutu.supabase.co" placeholder="https://your-project-id.supabase.co" class="w-full bg-slate-950/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono">
+              </div>
+
+              <div>
+                <label class="block font-bold text-slate-300 mb-1">
+                  Supabase Anon/Public Key <span class="text-rose-400">*</span>
+                  <span class="text-[10px] text-emerald-400 font-normal ml-1">(কখনো Secret Key দেবেন না)</span>
+                </label>
+                <div class="relative">
+                  <input type="password" id="supabase-anon-key-input" value="sb_publishable_..." placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." class="w-full bg-slate-950/90 border border-slate-700 rounded-xl pl-3.5 pr-10 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono">
+                  <button type="button" onclick="toggleAnonKeyVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-white text-xs">
+                    <i id="anon-key-eye-icon" class="fa-solid fa-eye"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 pt-2">
+              <button onclick="saveAndTestSupabaseConfig()" class="bg-sky-600 hover:bg-sky-500 text-white font-black text-xs py-2.5 px-5 rounded-xl shadow-lg transition flex items-center gap-2">
+                <i class="fa-solid fa-plug"></i> কানেকশন টেস্ট ও সক্রিয় করুন
+              </button>
+              <button onclick="migrateAllDataToCloud()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-2.5 px-5 rounded-xl shadow-lg transition flex items-center gap-2">
+                <i class="fa-solid fa-cloud-arrow-up"></i> লোকাল ডেটা ক্লাউডে আপলোড / সিঙ্ক করুন
+              </button>
+              <button onclick="syncAllFromSupabase(true)" class="bg-slate-700 hover:bg-slate-600 text-white font-black text-xs py-2.5 px-4 rounded-xl transition flex items-center gap-2">
+                <i class="fa-solid fa-rotate"></i> এখন রিফ্রেশ করুন
+              </button>
+            </div>
+          </div>
+
+          <!-- Cloud Table Metrics Overview -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center space-y-1">
+              <span class="text-xs text-slate-500 font-bold block">রক্তদাতা</span>
+              <strong id="cloud-metric-donors" class="text-xl font-black text-slate-900 font-mono">০</strong>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center space-y-1">
+              <span class="text-xs text-slate-500 font-bold block">স্বেচ্ছাসেবী</span>
+              <strong id="cloud-metric-volunteers" class="text-xl font-black text-slate-900 font-mono">০</strong>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center space-y-1">
+              <span class="text-xs text-slate-500 font-bold block">জরুরি রিকুয়েস্ট</span>
+              <strong id="cloud-metric-requests" class="text-xl font-black text-slate-900 font-mono">০</strong>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center space-y-1">
+              <span class="text-xs text-slate-500 font-bold block">নোটিশ</span>
+              <strong id="cloud-metric-notices" class="text-xl font-black text-slate-900 font-mono">০</strong>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center space-y-1">
+              <span class="text-xs text-slate-500 font-bold block">গ্যালারি</span>
+              <strong id="cloud-metric-activities" class="text-xl font-black text-slate-900 font-mono">০</strong>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center space-y-1">
+              <span class="text-xs text-slate-500 font-bold block">আবেদন</span>
+              <strong id="cloud-metric-aid" class="text-xl font-black text-slate-900 font-mono">০</strong>
+            </div>
+          </div>
+
+          <!-- Quick Setup Instructions Card -->
+          <div class="bg-slate-50 p-6 rounded-3xl border border-slate-200 space-y-4">
+            <h4 class="font-black text-slate-800 text-sm flex items-center gap-2">
+              <i class="fa-solid fa-circle-question text-sky-600"></i> Supabase সংযোগ নির্দেশিকা (মাত্র ৩টি সহজ ধাপ)
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600">
+              <div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-1.5 shadow-sm">
+                <strong class="text-slate-900 block font-bold">ধাপ ১: ফ্রি অ্যাকাউন্ট ও প্রজেক্ট</strong>
+                <p><strong>supabase.com</strong>-এ গিয়ে একটি নতুন ফ্রি প্রজেক্ট খুলুন (নাম দিন: Chader-Alo-Foundation)।</p>
+              </div>
+              <div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-1.5 shadow-sm">
+                <strong class="text-slate-900 block font-bold">ধাপ ২: SQL স্কিমা রান করুন</strong>
+                <p>Supabase-এর বাম মেনু থেকে <strong>SQL Editor</strong>-এ যান। প্রজেক্ট ফোল্ডারে থাকা <code class="bg-slate-100 text-rose-600 px-1 py-0.5 rounded font-mono">supabase_schema.sql</code> কোডটি পেস্ট করে Run দিন।</p>
+              </div>
+              <div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-1.5 shadow-sm">
+                <strong class="text-slate-900 block font-bold">ধাপ ৩: URL ও Anon Key দিন</strong>
+                <p>Project Settings > API থেকে <strong>Project URL</strong> এবং <strong>anon / public</strong> Key কপি করে উপরের বক্সে পেস্ট করে সেভ করুন।</p>
+              </div>
+            </div>
+            <div class="pt-2 flex items-center justify-between text-xs text-slate-500">
+              <span>* সব ডেটা PostgreSQL ক্লাউডে স্বয়ংক্রিয়ভাবে সংরক্ষিত ও ব্যাকআপ থাকবে।</span>
+              <button onclick="showSqlSchemaModal()" class="text-sky-700 hover:text-sky-800 font-bold flex items-center gap-1">
+                <i class="fa-solid fa-code"></i> SQL স্কিমা কোড দেখুন / কপি করুন
+              </button>
+            </div>
+          </div>
+
         </div>
 </div>
 
