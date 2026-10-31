@@ -7968,13 +7968,15 @@ function printDonationHistoryReport() {
 // ============================================================
 // NOTICE BOARD ENGINE (নোটিশ ও সার্কুলার সিস্টেম)
 // ============================================================
-function saveNotices() {
+async function saveNotices() {
   localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(notices));
   renderNoticeBoard();
   renderHomeNotices();
   renderAdminNoticeList();
   updateNoticeStats();
-  if (isSupabaseReady()) cloudBulkUpsertNotices(notices);
+  if (isSupabaseReady()) {
+    try { await cloudBulkUpsertNotices(notices); } catch(e) { console.error('Notice cloud sync failed:', e); }
+  }
 }
 
 function updateNoticeStats() {
@@ -8243,7 +8245,7 @@ function closeNoticeEditModal() {
   if (modal) modal.classList.add('hidden');
 }
 
-function handleNoticeSubmit(e) {
+async function handleNoticeSubmit(e) {
   e.preventDefault();
   const editId = document.getElementById('notice-edit-id')?.value;
   const title = document.getElementById('notice-input-title').value.trim();
@@ -8259,6 +8261,7 @@ function handleNoticeSubmit(e) {
     return;
   }
 
+  let targetNotice;
   if (editId) {
     const idx = notices.findIndex(n => n.id === editId);
     if (idx !== -1) {
@@ -8266,28 +8269,64 @@ function handleNoticeSubmit(e) {
         ...notices[idx],
         title, category, priority, date, author, summary, content
       };
+      targetNotice = notices[idx];
     }
   } else {
     let nextNum = notices.length + 1;
     while (notices.some(n => n.id === 'NOT-' + new Date().getFullYear() + '-' + String(nextNum).padStart(3, '0'))) {
       nextNum++;
     }
-    const newNotice = {
+    targetNotice = {
       id: 'NOT-' + new Date().getFullYear() + '-' + String(nextNum).padStart(3, '0'),
       title, category, priority, date, author, summary, content,
       status: 'active'
     };
-    notices.unshift(newNotice);
+    notices.unshift(targetNotice);
   }
 
-  saveNotices();
+  // স্থানীয়ভাবে সাথে সাথে সংরক্ষণ ও রেন্ডার
+  localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(notices));
+  renderNoticeBoard();
+  renderHomeNotices();
+  renderAdminNoticeList();
+  updateNoticeStats();
+
   closeNoticeEditModal();
 
-  Swal.fire({
-    icon: 'success',
-    title: editId ? 'নোটিশ সফলভাবে সংরক্ষিত হয়েছে!' : 'নতুন নোটিশ সফলভাবে প্রকাশিত হয়েছে!',
-    confirmButtonColor: '#e11d48'
-  });
+  // ক্লাউডে সংরক্ষণের চেষ্টা
+  if (isSupabaseReady() && targetNotice) {
+    const result = await cloudUpsertNotice(targetNotice);
+    if (result && result.success) {
+      Swal.fire({
+        icon: 'success',
+        title: editId ? 'নোটিশ সফলভাবে সংরক্ষিত হয়েছে!' : 'নতুন নোটিশ সফলভাবে প্রকাশিত হয়েছে!',
+        text: 'সব ডিভাইস ও ব্রাউজারে দেখা যাবে।',
+        confirmButtonColor: '#e11d48'
+      });
+    } else if (result && result.offline) {
+      Swal.fire({
+        icon: 'info',
+        title: editId ? 'নোটিশ স্থানীয়ভাবে সংরক্ষিত' : 'নোটিশ স্থানীয়ভাবে প্রকাশিত',
+        text: 'Supabase সংযোগ পাওয়া যাচ্ছে না। শুধু এই ডিভাইসে দেখা যাবে। অ্যাডমিন প্যানেলে Supabase Key সেট করুন।',
+        confirmButtonColor: '#e11d48'
+      });
+    } else {
+      Swal.fire({
+        icon: 'warning',
+        title: 'ক্লাউডে সংরক্ষণ ব্যর্থ!',
+        text: 'নোটিশ এই ডিভাইসে সংরক্ষিত হয়েছে, কিন্তু অন্য ডিভাইসে দেখা যাবে না। ইন্টারনেট সংযোগ ও Supabase সেটিং পরীক্ষা করুন।',
+        confirmButtonColor: '#e11d48'
+      });
+    }
+  } else {
+    // Supabase নেই — শুধু স্থানীয়
+    Swal.fire({
+      icon: 'success',
+      title: editId ? 'নোটিশ সংরক্ষিত হয়েছে!' : 'নোটিশ প্রকাশিত হয়েছে!',
+      text: 'Supabase সংযোগ নেই — শুধু এই ডিভাইসে দেখা যাবে।',
+      confirmButtonColor: '#e11d48'
+    });
+  }
 }
 
 function adminDeleteNotice(id) {
@@ -8997,18 +9036,28 @@ async function cloudDeleteRequest(id) {
 }
 
 async function cloudUpsertNotice(notice) {
-  if (!isSupabaseReady()) return;
+  if (!isSupabaseReady()) return { success: false, offline: true };
   try {
-    await supabaseClient.from('notices').upsert(noticeToRow(notice));
-  } catch(e) { console.error('Cloud upsert notice error:', e); }
+    const { error } = await supabaseClient.from('notices').upsert(noticeToRow(notice));
+    if (error) throw error;
+    return { success: true };
+  } catch(e) {
+    console.error('Cloud upsert notice error:', e);
+    return { success: false, error: e };
+  }
 }
 
 async function cloudBulkUpsertNotices(noticeList) {
-  if (!isSupabaseReady() || !Array.isArray(noticeList) || noticeList.length === 0) return;
+  if (!isSupabaseReady() || !Array.isArray(noticeList) || noticeList.length === 0) return { success: false, offline: true };
   try {
     const rows = noticeList.map(noticeToRow);
-    await supabaseClient.from('notices').upsert(rows);
-  } catch(e) { console.error('Cloud bulk upsert notices error:', e); }
+    const { error } = await supabaseClient.from('notices').upsert(rows);
+    if (error) throw error;
+    return { success: true };
+  } catch(e) {
+    console.error('Cloud bulk upsert notices error:', e);
+    return { success: false, error: e };
+  }
 }
 
 async function cloudDeleteNotice(id) {
