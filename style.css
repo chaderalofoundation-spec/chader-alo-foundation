@@ -1,0 +1,520 @@
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Custom Stylesheet for চাঁদের আলো ফাউন্ডেশন (Chader Alo Foundation) Portal */
+
+body {
+  font-family: 'Noto Sans Bengali', 'Anek Bangla', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-font-smoothing: antialiased;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* Nav Tab Buttons - Prominent & Bold */
+.nav-tab {
+  padding: 0.6rem 1rem;
+  border-radius: 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #334155;
+  transition: all 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.nav-tab:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.nav-tab.active {
+  background-color: #1b8040;
+  color: #ffffff !important;
+  box-shadow: 0 4px 8px -1px rgba(27, 128, 64, 0.3);
+}
+
+.nav-tab.active i {
+  color: #ffffff !important;
+}
+
+/* Sub-nav tabs */
+.sub-nav-btn {
+  padding: 0.55rem 1.1rem;
+  border-radius: 9999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #475569;
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  transition: all 0.15s ease;
+}
+
+.sub-nav-btn:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.sub-nav-btn.active {
+  background-color: #dc2626;
+  color: #ffffff !important;
+  border-color: #b91c1c;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.3);
+}
+
+.sub-nav-btn.active i {
+  color: #ffffff !important;
+}
+
+/* Admin Sub Tab Pill Buttons */
+.adm-tab-pill {
+  padding: 0.6rem 1.2rem;
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #475569;
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.adm-tab-pill:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.adm-tab-pill.active {
+  background-color: #0f172a;
+  color: #ffffff !important;
+  border-color: #0f172a;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.25);
+}
+
+.adm-tab-pill.active i {
+  color: #38bdf8 !important;
+}
+
+/* Group Quick Pills */
+.group-pill {
+  padding: 0.4rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background-color: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+  transition: all 0.15s ease;
+}
+
+.group-pill:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.group-pill.active {
+  background-color: #dc2626;
+  color: #ffffff;
+  border-color: #b91c1c;
+  box-shadow: 0 2px 5px rgba(220, 38, 38, 0.3);
+}
+
+/* Form Inputs - Larger, Readable Typography */
+.form-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  background-color: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 0.85rem;
+  color: #0f172a;
+  font-weight: 500;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  background-color: #ffffff;
+  border-color: #1b8040;
+  box-shadow: 0 0 0 3px rgba(27, 128, 64, 0.18);
+}
+
+/* Card hover animation */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 20px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+}
+
+/* Moving News Ticker Animation */
+.ticker-wrap {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.ticker-move {
+  display: inline-block;
+  white-space: nowrap;
+  padding-left: 100%;
+  animation: ticker 55s linear infinite; /* Slow, gentle, readable scroll */
+}
+
+.ticker-wrap:hover .ticker-move {
+  animation-play-state: paused;
+}
+
+@keyframes ticker {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-100%, 0, 0);
+  }
+}
+
+/* CR80 Standard ID Card (ISO/IEC 7810 ID-1 standard: 85.6mm x 54mm) */
+.cr80-card {
+  width: 380px;
+  height: 240px;
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 420px) {
+  .cr80-card {
+    width: 330px;
+    height: 215px;
+  }
+}
+
+/* Iconic Box Styling */
+
+/* Iconic Box Navigation Grid for Dashboard */
+.iconic-box {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  border-width: 2px;
+}
+
+.iconic-box:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.12), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.iconic-icon-badge {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  transition: transform 0.25s ease;
+}
+
+.iconic-box:hover .iconic-icon-badge {
+  transform: scale(1.1) rotate(6deg);
+}
+
+.print-cut-line {
+  display: none;
+}
+
+
+/* Print Optimization - A4 Paper Vertical Top-and-Bottom (উপর নিচে) Centered Layout */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 1.5cm;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  header, footer, #urgent-alert, .no-print, nav, #mobile-nav, .tab-btn, .group-pill, button, .ticker-wrap {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #view-paper-form {
+    display: block !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .printable-paper {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 1cm !important;
+    width: 100% !important;
+  }
+
+  body.printing-card * {
+    visibility: hidden;
+  }
+
+  body.printing-card #printable-volunteer-card-container,
+  body.printing-card #printable-volunteer-card-container *,
+  body.printing-card #printable-donor-card-container,
+  body.printing-card #printable-donor-card-container * {
+    visibility: visible;
+  }
+
+  body.printing-card #donor-card-modal,
+  body.printing-card #volunteer-card-modal {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #ffffff !important;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* Centered, Vertical Top-and-Bottom (উপর নিচে) Stack on A4 sheet */
+  body.printing-card #printable-volunteer-card-container,
+  body.printing-card #printable-donor-card-container {
+    position: relative !important;
+    margin: 25px auto !important;
+    display: flex !important;
+    flex-direction: column !important; /* উপর নিচে প্রিন্ট */
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 28px !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.printing-card .cr80-card {
+    box-shadow: none !important;
+    border: 1.5px solid #000000 !important;
+    page-break-inside: avoid;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.printing-card .print-cut-line {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 380px;
+    border-top: 1.5px dashed #64748b;
+    position: relative;
+    margin: -6px 0;
+    visibility: visible !important;
+  }
+
+  body.printing-card .print-cut-line span {
+    background: #ffffff;
+    padding: 0 12px;
+    font-size: 10px;
+    color: #475569;
+    font-family: sans-serif;
+    font-weight: bold;
+    visibility: visible !important;
+  }
+}
+
+
+/* ============================================================== */
+/* 3D ADMIN LOGIN & AUTHENTICATION TERMINAL                      */
+/* ============================================================== */
+.admin-3d-perspective-wrap {
+  perspective: 1200px;
+}
+
+.admin-3d-vault {
+  background: linear-gradient(135deg, #0b1320 0%, #03151f 50%, #022018 100%);
+  border-radius: 28px;
+  position: relative;
+  transform-style: preserve-3d;
+  box-shadow: 
+    0 30px 60px -15px rgba(0, 0, 0, 0.85),
+    0 15px 25px -10px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(16, 185, 129, 0.35),
+    inset 0 1px 2px rgba(255, 255, 255, 0.25),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.8);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease;
+}
+
+@media (min-width: 768px) {
+  .admin-3d-vault:hover {
+    transform: translateY(-4px) rotateX(2deg);
+    box-shadow: 
+      0 40px 75px -15px rgba(0, 0, 0, 0.9),
+      0 0 35px rgba(16, 185, 129, 0.25),
+      0 0 0 1.5px rgba(16, 185, 129, 0.5),
+      inset 0 1px 2px rgba(255, 255, 255, 0.35);
+  }
+}
+
+.admin-3d-screen {
+  background: radial-gradient(circle at 50% 30%, #091f19 0%, #020b08 100%);
+  border-radius: 18px;
+  border: 2px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 
+    inset 0 6px 16px rgba(0, 0, 0, 0.9),
+    inset 0 -2px 6px rgba(16, 185, 129, 0.15),
+    0 1px 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-3d-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(16, 185, 129, 0.03) 0px,
+    rgba(16, 185, 129, 0.03) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  pointer-events: none;
+}
+
+.admin-3d-key {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  color: #f1f5f9;
+  font-weight: 900;
+  border-radius: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(0, 0, 0, 0.3);
+  box-shadow: 
+    0 5px 0 #050a12,
+    0 8px 12px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: all 0.08s ease;
+  user-select: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-3d-key:hover {
+  background: linear-gradient(180deg, #273549 0%, #152238 100%);
+  color: #34d399;
+}
+
+.admin-3d-key:active {
+  transform: translateY(4px);
+  box-shadow: 
+    0 1px 0 #050a12,
+    0 3px 6px rgba(0, 0, 0, 0.6),
+    inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.admin-3d-key-clear {
+  background: linear-gradient(180deg, #7f1d1d 0%, #450a0a 100%) !important;
+  color: #fca5a5 !important;
+  box-shadow: 
+    0 5px 0 #280505,
+    0 8px 12px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.admin-3d-key-clear:hover {
+  background: linear-gradient(180deg, #991b1b 0%, #5a0c0c 100%) !important;
+}
+
+.admin-3d-key-clear:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 #280505, 0 3px 6px rgba(0, 0, 0, 0.6) !important;
+}
+
+.admin-3d-btn-submit {
+  background: linear-gradient(180deg, #10b981 0%, #047857 100%);
+  color: #ffffff;
+  font-weight: 900;
+  border-radius: 16px;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 
+    0 6px 0 #064e3b,
+    0 12px 20px rgba(16, 185, 129, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: all 0.1s ease;
+  cursor: pointer;
+}
+
+.admin-3d-btn-submit:hover {
+  background: linear-gradient(180deg, #34d399 0%, #059669 100%);
+  box-shadow: 
+    0 6px 0 #064e3b,
+    0 16px 26px rgba(16, 185, 129, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.admin-3d-btn-submit:active {
+  transform: translateY(4px);
+  box-shadow: 
+    0 2px 0 #064e3b,
+    0 4px 8px rgba(16, 185, 129, 0.4);
+}
+
+.admin-3d-swal-popup {
+  background: linear-gradient(145deg, #0b1320 0%, #022018 100%) !important;
+  border: 2px solid rgba(16, 185, 129, 0.45) !important;
+  border-radius: 28px !important;
+  box-shadow: 
+    0 35px 70px -15px rgba(0, 0, 0, 0.95),
+    0 0 35px rgba(16, 185, 129, 0.25),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+}
+
+.admin-3d-swal-confirm-btn {
+  background: linear-gradient(180deg, #10b981 0%, #047857 100%) !important;
+  color: #fff !important;
+  font-weight: 800 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 5px 0 #064e3b, 0 10px 18px rgba(16, 185, 129, 0.4) !important;
+  border-top: 1px solid rgba(255,255,255,0.3) !important;
+  padding: 10px 24px !important;
+  transition: all 0.1s ease !important;
+}
+
+.admin-3d-swal-confirm-btn:active {
+  transform: translateY(3px) !important;
+  box-shadow: 0 2px 0 #064e3b !important;
+}
+
+.admin-3d-swal-cancel-btn {
+  background: #334155 !important;
+  color: #cbd5e1 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 4px 0 #0f172a !important;
+  padding: 10px 20px !important;
+}
+
+.admin-3d-swal-cancel-btn:active {
+  transform: translateY(3px) !important;
+  box-shadow: 0 1px 0 #0f172a !important;
+}
