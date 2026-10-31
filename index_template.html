@@ -1849,12 +1849,19 @@ window.CAF_LOGO_DATA_URI = "assets/logo.png";
         <!-- Rendered dynamically by renderNoticeBoard() -->
       </div>
 
-      <div id="notices-empty" class="hidden bg-white p-12 text-center rounded-3xl border border-slate-200 shadow-sm space-y-3">
-        <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-2xl">
-          <i class="fa-solid fa-file-circle-xmark"></i>
+      <div id="notices-empty" class="hidden bg-white p-10 sm:p-14 text-center rounded-3xl border border-slate-200 shadow-sm space-y-4 max-w-lg mx-auto my-6">
+        <div class="w-20 h-20 rounded-full bg-rose-50 text-rose-500 border border-rose-100 flex items-center justify-center mx-auto text-3xl shadow-inner">
+          <i class="fa-regular fa-folder-open"></i>
         </div>
-        <h4 class="font-bold text-slate-800 text-base">কোনো নোটিশ পাওয়া যায়নি</h4>
-        <p class="text-xs text-slate-500">বর্তমানে এই ক্যাটাগরিতে বা সার্চ রেজাল্টে কোনো নোটিশ নেই।</p>
+        <div class="space-y-1.5">
+          <h4 class="font-black text-slate-800 text-lg sm:text-xl">কোনো নোটিশ পাওয়া যায়নি</h4>
+          <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">
+            বর্তমানে এই ক্যাটাগরিতে বা অনুসন্ধান ফলাফলে কোনো নোটিশ নেই।
+          </p>
+        </div>
+        <button onclick="filterNoticesByCat('ALL'); const s=document.getElementById('notice-search-input'); if(s) s.value='';" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md transition">
+          <i class="fa-solid fa-rotate-left"></i> সকল নোটিশ প্রদর্শন করুন
+        </button>
       </div>
 
     </section>
@@ -3454,16 +3461,16 @@ window.CAF_LOGO_DATA_URI = "assets/logo.png";
       <div id="notice-print-area" class="p-6 sm:p-8 space-y-6 overflow-y-auto bg-white text-slate-800">
         
         <!-- Official Pad Header -->
-        <div class="border-b-2 border-slate-900 pb-4 flex items-center justify-between gap-4">
+        <div class="border-b-2 border-slate-900 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div class="flex items-center gap-3">
-            <img src="assets/logo.png" alt="Logo" class="w-16 h-16 object-contain">
+            <img src="assets/logo.png" alt="Logo" class="w-14 sm:w-16 h-14 sm:h-16 object-contain shrink-0">
             <div>
-              <h2 class="text-xl sm:text-2xl font-black text-slate-900 leading-tight">চাঁদের আলো ফাউন্ডেশন</h2>
-              <p class="text-[11px] text-emerald-700 font-bold uppercase tracking-wider">Chader Alo Foundation | আর্ত মানবতার সেবায় আমরা</p>
-              <p class="text-[10px] text-slate-500 mt-0.5">কার্যালয়: বিসমিল্লাহ ভবন, কলেজ রোড, ভবেরচর, গজারিয়া, মুন্সীগঞ্জ</p>
+              <h2 class="text-lg sm:text-2xl font-black text-slate-900 leading-tight">চাঁদের আলো ফাউন্ডেশন</h2>
+              <p class="text-[10px] sm:text-[11px] text-emerald-700 font-bold uppercase tracking-wider">Chader Alo Foundation | আর্ত মানবতার সেবায় আমরা</p>
+              <p class="text-[9px] sm:text-[10px] text-slate-500 mt-0.5">কার্যালয়: বিসমিল্লাহ ভবন, কলেজ রোড, ভবেরচর, গজারিয়া, মুন্সীগঞ্জ</p>
             </div>
           </div>
-          <div class="text-left text-xs font-mono text-slate-600 shrink-0">
+          <div class="text-right sm:text-left text-[11px] sm:text-xs font-mono text-slate-600 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
             <div><span class="font-bold">স্মারক:</span> <span id="view-notice-id">CAF-NOT-001</span></div>
             <div><span class="font-bold">তারিখ:</span> <span id="view-notice-date">2026-10-31</span></div>
           </div>

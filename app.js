@@ -296,6 +296,40 @@ const INITIAL_NOTICES = [
   }
 ];
 
+// Initial Gallery Activities Seed Data
+const INITIAL_ACTIVITIES = [
+  {
+    id: "ACT-01",
+    title: "বিনামূল্যে রক্তের গ্রুপ নির্ণয় কর্মসূচি",
+    category: "রক্তদান",
+    mediaType: "image",
+    mediaUrl: "",
+    date: "2026-03-20",
+    location: "ভবেরচর কলেজ রোড, গজারিয়া",
+    description: "চাঁদের আলো ফাউন্ডেশনের উদ্যোগে দিনব্যাপী বিনামূল্যে রক্তের গ্রুপ নির্ণয় ও সচেতনতামূলক ক্যাম্পেইন।"
+  },
+  {
+    id: "ACT-02",
+    title: "অসহায় ও শীতার্ত মানুষের মাঝে শীতবস্ত্র বিতরণ",
+    category: "ত্রাণ",
+    mediaType: "image",
+    mediaUrl: "",
+    date: "2026-01-10",
+    location: "হোগলাকান্দি, গজারিয়া",
+    description: "শীত মৌসুমে হতদরিদ্র পরিবারের মাঝে কম্বল ও গরম কাপড় বিতরণ।"
+  },
+  {
+    id: "ACT-03",
+    title: "পরিবেশ সুরক্ষায় বৃক্ষরোপণ কর্মসূচি",
+    category: "বৃক্ষরোপণ",
+    mediaType: "image",
+    mediaUrl: "",
+    date: "2026-06-05",
+    location: "গজারিয়া উপজেলা চত্বর",
+    description: "বিশ্ব পরিবেশ দিবস উপলক্ষে ফলজ ও বনজ গাছের চারা রোপণ ও বিতরণ।"
+  }
+];
+
 // Storage Keys
 const STORAGE_KEYS = {
   DONORS: "caf_blood_donors_data_v4",
@@ -435,6 +469,10 @@ function initApp() {
   checkAdminSession();
   setupFilterPills();
   renderGallery('ALL');
+  renderNoticeBoard();
+  renderHomeNotices();
+  updateNoticeStats();
+  renderAdminNoticeList();
   applyAdminUIState();
 }
 
@@ -599,10 +637,32 @@ function loadData() {
   // Notices
   const nt = localStorage.getItem(STORAGE_KEYS.NOTICES);
   if (nt) {
-    try { notices = JSON.parse(nt); } catch(e){ notices = [...INITIAL_NOTICES]; }
+    try { 
+      notices = JSON.parse(nt); 
+    } catch(e) { 
+      notices = JSON.parse(JSON.stringify(INITIAL_NOTICES)); 
+    }
+    // Requirement 2: localStorage-এ notices নামে খালি অ্যারে [] থাকলেও ডিফল্ট নোটিশগুলো যেন হারিয়ে না যায়
+    if (!Array.isArray(notices) || notices.length === 0) {
+      notices = JSON.parse(JSON.stringify(INITIAL_NOTICES));
+      localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(notices));
+    } else {
+      // Requirement 1 & 9: Ensure all default notices are present
+      let needsSave = false;
+      INITIAL_NOTICES.forEach(defN => {
+        if (!notices.some(n => n.id === defN.id)) {
+          notices.push(JSON.parse(JSON.stringify(defN)));
+          needsSave = true;
+        }
+      });
+      if (needsSave) {
+        localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(notices));
+      }
+    }
   } else {
-    notices = [...INITIAL_NOTICES];
-    saveNotices();
+    // Requirement 3: প্রথমবার ওয়েবসাইট চালু হলে ডিফল্ট নোটিশগুলো স্বয়ংক্রিয়ভাবে লোড হবে
+    notices = JSON.parse(JSON.stringify(INITIAL_NOTICES));
+    localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(notices));
   }
 
   // PIN
@@ -643,7 +703,6 @@ function switchMainTab(tabId) {
   const activeBtn = document.getElementById(`nav-btn-${tabId}`);
   if (activeView) activeView.classList.remove('hidden');
   if (activeBtn) activeBtn.classList.add('active');
-  if (subId === 'blood-history') renderDonationHistory();
 
   if (tabId === 'bloodlink') {
     filterDonors();
@@ -651,6 +710,10 @@ function switchMainTab(tabId) {
     renderVolunteersGrid();
   } else if (tabId === 'gallery') {
     renderGallery('ALL');
+  } else if (tabId === 'notice') {
+    renderNoticeBoard();
+    updateNoticeStats();
+    applyAdminUIState();
   } else if (tabId === 'admin') {
     if (isAdminLoggedIn) updateAdminDashboard();
     applyAdminUIState();
@@ -672,6 +735,7 @@ function switchBloodSubTab(subId) {
   const activeBtn = document.getElementById(`blood-subtab-${subId.replace('blood-', '')}`);
   if (activeView) activeView.classList.remove('hidden');
   if (activeBtn) activeBtn.classList.add('active');
+  if (subId === 'blood-history') renderDonationHistory();
 }
 
 function switchVolSubTab(subId) {
@@ -759,6 +823,7 @@ function renderAllServices() {
       </div>
     `;
   }).join('');
+  applyAdminUIState();
 }
 
 // -------------------------------------------------------------
@@ -3451,11 +3516,13 @@ function renderNoticeBoard() {
   if (currentNoticeCategory === 'PINNED') {
     list = list.filter(n => n.priority === 'pinned' || n.priority === 'urgent');
   } else if (currentNoticeCategory === 'BLOOD') {
-    list = list.filter(n => n.category === 'রক্তদান কর্মসূচি');
+    list = list.filter(n => n.category && n.category.includes('রক্তদান'));
   } else if (currentNoticeCategory === 'WELFARE') {
-    list = list.filter(n => n.category === 'সমাজকল্যাণ');
+    list = list.filter(n => n.category && n.category.includes('সমাজকল্যাণ'));
   } else if (currentNoticeCategory === 'GENERAL') {
-    list = list.filter(n => n.category === 'সাধারণ নোটিশ' || n.category === 'প্রশাসনিক সার্কুলার');
+    list = list.filter(n => n.category && (n.category.includes('সাধারণ') || n.category.includes('সার্কুলার') || n.category.includes('প্রশাসনিক')));
+  } else if (currentNoticeCategory !== 'ALL') {
+    list = list.filter(n => n.category === currentNoticeCategory);
   }
 
   // Search filter
@@ -3477,9 +3544,11 @@ function renderNoticeBoard() {
 
   if (list.length === 0) {
     grid.innerHTML = '';
+    grid.classList.add('hidden');
     if (emptyEl) emptyEl.classList.remove('hidden');
     return;
   }
+  grid.classList.remove('hidden');
   if (emptyEl) emptyEl.classList.add('hidden');
 
   grid.innerHTML = list.map(n => {
@@ -3552,7 +3621,10 @@ function renderHomeNotices() {
 
   const latestTwo = activeNotices.slice(0, 2);
   if (latestTwo.length === 0) {
-    container.innerHTML = '<div class="col-span-2 text-center text-slate-400 text-xs py-3">বর্তমানে কোনো জরুরি নোটিশ নেই।</div>';
+    container.innerHTML = `<div class="col-span-full py-8 text-center bg-white/5 rounded-2xl border border-white/10 space-y-2">
+      <div class="text-slate-400 text-2xl"><i class="fa-regular fa-folder-open"></i></div>
+      <p class="text-slate-300 text-xs font-bold">বর্তমানে কোনো সক্রিয় নোটিশ নেই</p>
+    </div>`;
     return;
   }
 
@@ -3680,8 +3752,12 @@ function handleNoticeSubmit(e) {
       };
     }
   } else {
+    let nextNum = notices.length + 1;
+    while (notices.some(n => n.id === 'NOT-' + new Date().getFullYear() + '-' + String(nextNum).padStart(3, '0'))) {
+      nextNum++;
+    }
     const newNotice = {
-      id: 'NOT-' + new Date().getFullYear() + '-' + String(notices.length + 1).padStart(3, '0'),
+      id: 'NOT-' + new Date().getFullYear() + '-' + String(nextNum).padStart(3, '0'),
       title, category, priority, date, author, summary, content,
       status: 'active'
     };
