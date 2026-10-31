@@ -215,6 +215,7 @@ const INITIAL_DONORS = [
 
 // Default Settings
 const DEFAULT_SETTINGS = {
+  history: "২০২১ সালের ১০ এপ্রিল মুন্সীগঞ্জ জেলার গজারিয়া উপজেলার ইমামপুর ইউনিয়নের বিভিন্ন গ্রামের একদল উদ্যমী, সমাজসচেতন ও মানবিক যুবকদের হাত ধরে প্রতিষ্ঠিত হয় <strong>চাঁদের আলো ফাউন্ডেশন (Chader Alo Foundation)</strong>। উদ্দেশ্যহীন সমাজকল্যাণ নয়, বরং একটি সুশৃঙ্খল, স্বচ্ছ ও প্রাতিষ্ঠানিক কাঠামোর মাধ্যমে সমাজের সবচেয়ে অবহেলিত ও নিপীড়িত মানুষের দ্বারে খাদ্য, বস্ত্র, ওষুধ ও জরুরি রক্ত পৌঁছে দেওয়াই আমাদের ব্রত।",
   helpline: "০১৯১৪-৯২৭৯৩৩",
   helplineRaw: "01914927933",
   whatsapp: "01914927933",
@@ -540,6 +541,9 @@ function loadData() {
   if (st) {
     try {
       siteSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(st) };
+      if (!siteSettings.history || siteSettings.history.includes('ভবেরচর বাজারে')) {
+        siteSettings.history = DEFAULT_SETTINGS.history;
+      }
       if (!siteSettings.headlines || !Array.isArray(siteSettings.headlines) || siteSettings.headlines.length === 0) {
         siteSettings.headlines = (siteSettings.marqueeText ? siteSettings.marqueeText.split('\n').map(s=>s.trim()).filter(Boolean) : [...defaultHeadlines]);
       }
@@ -1847,6 +1851,10 @@ function formatHeadlinesForTicker() {
 }
 
 function applySiteSettings() {
+  const historyEl = document.getElementById('about-history-text');
+  if (historyEl && (siteSettings.history || DEFAULT_SETTINGS.history)) {
+    historyEl.innerHTML = siteSettings.history || DEFAULT_SETTINGS.history;
+  }
   const clean = siteSettings.helplineRaw || siteSettings.helpline.replace(/[^0-9]/g, '');
   document.getElementById('top-announcement-display').textContent = siteSettings.announcement;
   document.getElementById('header-address-display').innerHTML = `<i class="fa-solid fa-location-dot mr-1"></i> ${siteSettings.addressShort || siteSettings.address}`;
