@@ -229,7 +229,7 @@ const DEFAULT_SETTINGS = {
   president: {
     name: "হালিম দেওয়ান",
     title: "প্রতিষ্ঠাতা ও সভাপতি, চাঁদের আলো ফাউন্ডেশন",
-    photo: "",
+    photo: "assets/leader_halim.jpg",
     message: "বিসমিল্লাহির রাহমানির রাহিম। ২০২১ সালের ১০ এপ্রিল আর্ত মানবতার সেবার মহান ব্রত নিয়ে আমরা চাঁদের আলো ফাউন্ডেশনের সূচনা করেছিলাম। আমাদের লক্ষ্য সমাজের সুবিধাবঞ্চিত, অসহায় ও মুমূর্ষু মানুষের মুখে হাসি ফোটানো। বিশেষ করে রক্তের অভাবে যেন একটি তাজা প্রাণও ঝরে না যায়, সেজন্য আমাদের ব্লাড লিংক টিম নিরলসভাবে কাজ করে যাচ্ছে। শিক্ষা, চিকিৎসাসেবা, প্রতিবন্ধী পুনর্বাসন এবং নারীর আত্মকর্মসংস্থানে আমরা সবার সম্মিলিত সহযোগিতা কামনা করি। আসুন, মানবতার সেবায় সবাই একতাবদ্ধ হই।"
   },
   secretary: {
@@ -301,13 +301,14 @@ const INITIAL_NOTICES = [
 const INITIAL_ACTIVITIES = [
   {
     id: "ACT-01",
-    title: "বিনামূল্যে রক্তের গ্রুপ নির্ণয় কর্মসূচি",
+    title: "গজারিয়ায় বিনামূল্যে রক্তের গ্রুপ নির্ণয়",
     category: "রক্তদান",
     mediaType: "image",
-    mediaUrl: "",
-    date: "2026-03-20",
-    location: "ভবেরচর কলেজ রোড, গজারিয়া",
-    description: "চাঁদের আলো ফাউন্ডেশনের উদ্যোগে দিনব্যাপী বিনামূল্যে রক্তের গ্রুপ নির্ণয় ও সচেতনতামূলক ক্যাম্পেইন।"
+    mediaUrl: "assets/activity_blood.jpg",
+    date: "2021-11-14",
+    location: "কালীপুরা এনএস কান্দি সরকারি প্রাথমিক বিদ্যালয়, ইমামপুর, গজারিয়া",
+    description: "মুন্সীগঞ্জের গজারিয়া উপজেলার ইমামপুর ইউনিয়নের কালীপুরা এনএস কান্দি সরকারি প্রাথমিক বিদ্যালয়ে চাঁদের আলো ফাউন্ডেশনের উদ্যোগে দিনব্যাপী বিনামূল্যে রক্তের গ্রুপ নির্ণয় ও সচেতনতামূলক কর্মসূচি অনুষ্ঠিত হয়। এতে চার শতাধিক মানুষের রক্তের গ্রুপ নির্ণয় করা হয়।",
+    desc: "মুন্সীগঞ্জের গজারিয়া উপজেলার ইমামপুর ইউনিয়নের কালীপুরা এনএস কান্দি সরকারি প্রাথমিক বিদ্যালয়ে চাঁদের আলো ফাউন্ডেশনের উদ্যোগে দিনব্যাপী বিনামূল্যে রক্তের গ্রুপ নির্ণয় ও সচেতনতামূলক কর্মসূচি অনুষ্ঠিত হয়। এতে চার শতাধিক মানুষের রক্তের গ্রুপ নির্ণয় করা হয়।"
   },
   {
     id: "ACT-02",
@@ -315,19 +316,21 @@ const INITIAL_ACTIVITIES = [
     category: "ত্রাণ",
     mediaType: "image",
     mediaUrl: "",
-    date: "2026-01-10",
-    location: "হোগলাকান্দি, গজারিয়া",
-    description: "শীত মৌসুমে হতদরিদ্র পরিবারের মাঝে কম্বল ও গরম কাপড় বিতরণ।"
+    date: "2022-01-10",
+    location: "হোগলাকান্দি, গজারিয়া",
+    description: "শীত মৌসুমে হতদরিদ্র পরিবারের মাঝে কম্বল ও গরম কাপড় বিতরণ কর্মসূচি।",
+    desc: "শীত মৌসুমে হতদরিদ্র পরিবারের মাঝে কম্বল ও গরম কাপড় বিতরণ কর্মসূচি।"
   },
   {
     id: "ACT-03",
-    title: "পরিবেশ সুরক্ষায় বৃক্ষরোপণ কর্মসূচি",
+    title: "মাসব্যাপী বৃক্ষরোপণ কর্মসূচি-২০২১",
     category: "বৃক্ষরোপণ",
     mediaType: "image",
-    mediaUrl: "",
-    date: "2026-06-05",
-    location: "গজারিয়া উপজেলা চত্বর",
-    description: "বিশ্ব পরিবেশ দিবস উপলক্ষে ফলজ ও বনজ গাছের চারা রোপণ ও বিতরণ।"
+    mediaUrl: "assets/activity_tree.jpg",
+    date: "2021-07-06",
+    location: "গজারিয়া, মুন্সীগঞ্জ",
+    description: "পরিবেশের ভারসাম্য রক্ষা ও সবুজায়নের লক্ষ্যে চাঁদের আলো ফাউন্ডেশনের উদ্যোগে মাসব্যাপী বৃক্ষরোপণ কর্মসূচি-২০২১ পরিচালিত হয় এবং বিভিন্ন প্রতিষ্ঠানে ফলজ ও বনজ গাছের চারা রোপণ করা হয়।",
+    desc: "পরিবেশের ভারসাম্য রক্ষা ও সবুজায়নের লক্ষ্যে চাঁদের আলো ফাউন্ডেশনের উদ্যোগে মাসব্যাপী বৃক্ষরোপণ কর্মসূচি-২০২১ পরিচালিত হয় এবং বিভিন্ন প্রতিষ্ঠানে ফলজ ও বনজ গাছের চারা রোপণ করা হয়।"
   }
 ];
 
@@ -405,6 +408,36 @@ function applyEmbeddedLogo() {
       el.src = window.CAF_SIG_HALIM_DATA_URI;
     });
   }
+  if (typeof window.CAF_PHOTO_PRESIDENT_DATA_URI !== 'undefined' && window.CAF_PHOTO_PRESIDENT_DATA_URI) {
+    document.querySelectorAll('img[src*="leader_halim.jpg"]').forEach(el => {
+      el.src = window.CAF_PHOTO_PRESIDENT_DATA_URI;
+    });
+    if (DEFAULT_SETTINGS.president) DEFAULT_SETTINGS.president.photo = window.CAF_PHOTO_PRESIDENT_DATA_URI;
+    if (siteSettings.president) siteSettings.president.photo = window.CAF_PHOTO_PRESIDENT_DATA_URI;
+  }
+  if (typeof window.CAF_PHOTO_SECRETARY_DATA_URI !== 'undefined' && window.CAF_PHOTO_SECRETARY_DATA_URI) {
+    document.querySelectorAll('img[src*="leader_masum.png"]').forEach(el => {
+      el.src = window.CAF_PHOTO_SECRETARY_DATA_URI;
+    });
+    if (DEFAULT_SETTINGS.secretary) DEFAULT_SETTINGS.secretary.photo = window.CAF_PHOTO_SECRETARY_DATA_URI;
+    if (siteSettings.secretary) siteSettings.secretary.photo = window.CAF_PHOTO_SECRETARY_DATA_URI;
+  }
+  if (typeof window.CAF_PHOTO_BLOOD_DATA_URI !== 'undefined' && window.CAF_PHOTO_BLOOD_DATA_URI) {
+    const actBlood = INITIAL_ACTIVITIES.find(a => a.id === 'ACT-01');
+    if (actBlood) actBlood.mediaUrl = window.CAF_PHOTO_BLOOD_DATA_URI;
+    const currentBlood = activities.find(a => a.id === 'ACT-01');
+    if (currentBlood && (!currentBlood.mediaUrl || currentBlood.mediaUrl.includes('assets/'))) {
+      currentBlood.mediaUrl = window.CAF_PHOTO_BLOOD_DATA_URI;
+    }
+  }
+  if (typeof window.CAF_PHOTO_TREE_DATA_URI !== 'undefined' && window.CAF_PHOTO_TREE_DATA_URI) {
+    const actTree = INITIAL_ACTIVITIES.find(a => a.id === 'ACT-03');
+    if (actTree) actTree.mediaUrl = window.CAF_PHOTO_TREE_DATA_URI;
+    const currentTree = activities.find(a => a.id === 'ACT-03');
+    if (currentTree && (!currentTree.mediaUrl || currentTree.mediaUrl.includes('assets/'))) {
+      currentTree.mediaUrl = window.CAF_PHOTO_TREE_DATA_URI;
+    }
+  }
 }
 
 // Initialize on Load (Supports both synchronous, standalone, and async loading)
@@ -440,21 +473,6 @@ function incrementVisitorCount() {
     localStorage.setItem(STORAGE_KEYS.VISITORS, count.toString());
   }
   return count;
-
-  if (typeof window.CAF_PHOTO_PRESIDENT_DATA_URI !== 'undefined' && window.CAF_PHOTO_PRESIDENT_DATA_URI) {
-    document.querySelectorAll('img[src*="leader_halim.jpg"]').forEach(el => {
-      el.src = window.CAF_PHOTO_PRESIDENT_DATA_URI;
-    });
-    if (DEFAULT_SETTINGS.president) DEFAULT_SETTINGS.president.photo = window.CAF_PHOTO_PRESIDENT_DATA_URI;
-    if (siteSettings.president) siteSettings.president.photo = window.CAF_PHOTO_PRESIDENT_DATA_URI;
-  }
-  if (typeof window.CAF_PHOTO_SECRETARY_DATA_URI !== 'undefined' && window.CAF_PHOTO_SECRETARY_DATA_URI) {
-    document.querySelectorAll('img[src*="leader_masum.png"]').forEach(el => {
-      el.src = window.CAF_PHOTO_SECRETARY_DATA_URI;
-    });
-    if (DEFAULT_SETTINGS.secretary) DEFAULT_SETTINGS.secretary.photo = window.CAF_PHOTO_SECRETARY_DATA_URI;
-    if (siteSettings.secretary) siteSettings.secretary.photo = window.CAF_PHOTO_SECRETARY_DATA_URI;
-  }
 }
 
 function initApp() {
@@ -554,11 +572,11 @@ function loadData() {
         siteSettings.secretary = { ...DEFAULT_SETTINGS.secretary, ...(siteSettings.secretary || {}), name: 'মোঃ মাসুম শিকদার' };
       }
             // Ensure President & Secretary photos are set
-      if (!siteSettings.president.photo || siteSettings.president.photo === '') {
-        siteSettings.president.photo = DEFAULT_SETTINGS.president.photo;
+      if (!siteSettings.president.photo || siteSettings.president.photo === '' || siteSettings.president.photo.includes('leader_halim.jpg')) {
+        siteSettings.president.photo = (typeof window !== 'undefined' && window.CAF_PHOTO_PRESIDENT_DATA_URI) ? window.CAF_PHOTO_PRESIDENT_DATA_URI : DEFAULT_SETTINGS.president.photo;
       }
-      if (!siteSettings.secretary.photo || siteSettings.secretary.photo === '') {
-        siteSettings.secretary.photo = DEFAULT_SETTINGS.secretary.photo;
+      if (!siteSettings.secretary.photo || siteSettings.secretary.photo === '' || siteSettings.secretary.photo.includes('leader_masum.png')) {
+        siteSettings.secretary.photo = (typeof window !== 'undefined' && window.CAF_PHOTO_SECRETARY_DATA_URI) ? window.CAF_PHOTO_SECRETARY_DATA_URI : DEFAULT_SETTINGS.secretary.photo;
       }
       if (!siteSettings.donation) {
         siteSettings.donation = { ...DEFAULT_SETTINGS.donation };
@@ -626,9 +644,35 @@ function loadData() {
   // Activities (Gallery)
   const ac = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
   if (ac) {
-    try { activities = JSON.parse(ac); } catch(e){ activities = [...INITIAL_ACTIVITIES]; }
+    try { 
+      activities = JSON.parse(ac); 
+    } catch(e) { 
+      activities = JSON.parse(JSON.stringify(INITIAL_ACTIVITIES)); 
+    }
+    if (!Array.isArray(activities) || activities.length === 0) {
+      activities = JSON.parse(JSON.stringify(INITIAL_ACTIVITIES));
+      saveActivities();
+    } else {
+      let updated = false;
+      INITIAL_ACTIVITIES.forEach(defAct => {
+        const existIdx = activities.findIndex(a => a.id === defAct.id);
+        if (existIdx === -1) {
+          activities.push(JSON.parse(JSON.stringify(defAct)));
+          updated = true;
+        } else if ((!activities[existIdx].mediaUrl || activities[existIdx].mediaUrl === '' || activities[existIdx].mediaUrl.includes('assets/')) && defAct.mediaUrl) {
+          activities[existIdx].mediaUrl = defAct.mediaUrl;
+          activities[existIdx].title = defAct.title;
+          activities[existIdx].location = defAct.location;
+          activities[existIdx].date = defAct.date;
+          activities[existIdx].description = defAct.description;
+          activities[existIdx].desc = defAct.desc;
+          updated = true;
+        }
+      });
+      if (updated) saveActivities();
+    }
   } else {
-    activities = [...INITIAL_ACTIVITIES];
+    activities = JSON.parse(JSON.stringify(INITIAL_ACTIVITIES));
     saveActivities();
   }
 
@@ -1882,8 +1926,9 @@ function applySiteSettings() {
     if (nameEl) nameEl.textContent = p.name || 'হালিম দেওয়ান';
     if (titleEl) titleEl.textContent = p.title || 'সভাপতি, চাঁদের আলো ফাউন্ডেশন';
     if (msgEl) msgEl.textContent = p.message || '';
-    if (p.photo && imgEl && avatarEl) {
-      imgEl.src = p.photo;
+    const presPhoto = p.photo || (typeof window !== 'undefined' ? window.CAF_PHOTO_PRESIDENT_DATA_URI : null) || DEFAULT_SETTINGS.president.photo;
+    if (presPhoto && imgEl && avatarEl) {
+      imgEl.src = presPhoto;
       imgEl.classList.remove('hidden');
       avatarEl.classList.add('hidden');
     } else if (imgEl && avatarEl) {
@@ -1904,8 +1949,9 @@ function applySiteSettings() {
     if (nameEl) nameEl.textContent = s.name || 'মোঃ মাসুম শিকদার';
     if (titleEl) titleEl.textContent = s.title || 'সাধারণ সম্পাদক, চাঁদের আলো ফাউন্ডেশন';
     if (msgEl) msgEl.textContent = s.message || '';
-    if (s.photo && imgEl && avatarEl) {
-      imgEl.src = s.photo;
+    const secPhoto = s.photo || (typeof window !== 'undefined' ? window.CAF_PHOTO_SECRETARY_DATA_URI : null) || DEFAULT_SETTINGS.secretary.photo;
+    if (secPhoto && imgEl && avatarEl) {
+      imgEl.src = secPhoto;
       imgEl.classList.remove('hidden');
       avatarEl.classList.add('hidden');
     } else if (imgEl && avatarEl) {
@@ -2174,7 +2220,7 @@ function openLightbox(actId) {
   document.getElementById('lightbox-title').textContent = act.title;
   document.getElementById('lightbox-date').innerHTML = `<i class="fa-regular fa-calendar mr-1"></i>${act.date || ''}`;
   document.getElementById('lightbox-location').innerHTML = `<i class="fa-solid fa-location-dot mr-1"></i>${act.location || ''}`;
-  document.getElementById('lightbox-desc').textContent = act.desc || '';
+  document.getElementById('lightbox-desc').textContent = act.description || act.desc || '';
 
   modal.classList.remove('hidden');
 }
