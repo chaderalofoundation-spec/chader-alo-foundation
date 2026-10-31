@@ -4412,7 +4412,7 @@ const DEFAULT_SETTINGS = {
   president: {
     name: "হালিম দেওয়ান",
     title: "প্রতিষ্ঠাতা ও সভাপতি, চাঁদের আলো ফাউন্ডেশন",
-    photo: "",
+    photo: "assets/leader_halim.jpg",
     message: "বিসমিল্লাহির রাহমানির রাহিম। ২০২১ সালের ১০ এপ্রিল আর্ত মানবতার সেবার মহান ব্রত নিয়ে আমরা চাঁদের আলো ফাউন্ডেশনের সূচনা করেছিলাম। আমাদের লক্ষ্য সমাজের সুবিধাবঞ্চিত, অসহায় ও মুমূর্ষু মানুষের মুখে হাসি ফোটানো। বিশেষ করে রক্তের অভাবে যেন একটি তাজা প্রাণও ঝরে না যায়, সেজন্য আমাদের ব্লাড লিংক টিম নিরলসভাবে কাজ করে যাচ্ছে। শিক্ষা, চিকিৎসাসেবা, প্রতিবন্ধী পুনর্বাসন এবং নারীর আত্মকর্মসংস্থানে আমরা সবার সম্মিলিত সহযোগিতা কামনা করি। আসুন, মানবতার সেবায় সবাই একতাবদ্ধ হই।"
   },
   secretary: {
@@ -4588,6 +4588,20 @@ function applyEmbeddedLogo() {
       el.src = window.CAF_SIG_HALIM_DATA_URI;
     });
   }
+  if (typeof window.CAF_PHOTO_PRESIDENT_DATA_URI !== 'undefined' && window.CAF_PHOTO_PRESIDENT_DATA_URI) {
+    document.querySelectorAll('img[src*="leader_halim.jpg"]').forEach(el => {
+      el.src = window.CAF_PHOTO_PRESIDENT_DATA_URI;
+    });
+    if (DEFAULT_SETTINGS.president) DEFAULT_SETTINGS.president.photo = window.CAF_PHOTO_PRESIDENT_DATA_URI;
+    if (siteSettings.president) siteSettings.president.photo = window.CAF_PHOTO_PRESIDENT_DATA_URI;
+  }
+  if (typeof window.CAF_PHOTO_SECRETARY_DATA_URI !== 'undefined' && window.CAF_PHOTO_SECRETARY_DATA_URI) {
+    document.querySelectorAll('img[src*="leader_masum.png"]').forEach(el => {
+      el.src = window.CAF_PHOTO_SECRETARY_DATA_URI;
+    });
+    if (DEFAULT_SETTINGS.secretary) DEFAULT_SETTINGS.secretary.photo = window.CAF_PHOTO_SECRETARY_DATA_URI;
+    if (siteSettings.secretary) siteSettings.secretary.photo = window.CAF_PHOTO_SECRETARY_DATA_URI;
+  }
 }
 
 // Initialize on Load (Supports both synchronous, standalone, and async loading)
@@ -4623,21 +4637,6 @@ function incrementVisitorCount() {
     localStorage.setItem(STORAGE_KEYS.VISITORS, count.toString());
   }
   return count;
-
-  if (typeof window.CAF_PHOTO_PRESIDENT_DATA_URI !== 'undefined' && window.CAF_PHOTO_PRESIDENT_DATA_URI) {
-    document.querySelectorAll('img[src*="leader_halim.jpg"]').forEach(el => {
-      el.src = window.CAF_PHOTO_PRESIDENT_DATA_URI;
-    });
-    if (DEFAULT_SETTINGS.president) DEFAULT_SETTINGS.president.photo = window.CAF_PHOTO_PRESIDENT_DATA_URI;
-    if (siteSettings.president) siteSettings.president.photo = window.CAF_PHOTO_PRESIDENT_DATA_URI;
-  }
-  if (typeof window.CAF_PHOTO_SECRETARY_DATA_URI !== 'undefined' && window.CAF_PHOTO_SECRETARY_DATA_URI) {
-    document.querySelectorAll('img[src*="leader_masum.png"]').forEach(el => {
-      el.src = window.CAF_PHOTO_SECRETARY_DATA_URI;
-    });
-    if (DEFAULT_SETTINGS.secretary) DEFAULT_SETTINGS.secretary.photo = window.CAF_PHOTO_SECRETARY_DATA_URI;
-    if (siteSettings.secretary) siteSettings.secretary.photo = window.CAF_PHOTO_SECRETARY_DATA_URI;
-  }
 }
 
 function initApp() {
@@ -4737,11 +4736,11 @@ function loadData() {
         siteSettings.secretary = { ...DEFAULT_SETTINGS.secretary, ...(siteSettings.secretary || {}), name: 'মোঃ মাসুম শিকদার' };
       }
             // Ensure President & Secretary photos are set
-      if (!siteSettings.president.photo || siteSettings.president.photo === '') {
-        siteSettings.president.photo = DEFAULT_SETTINGS.president.photo;
+      if (!siteSettings.president.photo || siteSettings.president.photo === '' || siteSettings.president.photo.includes('leader_halim.jpg')) {
+        siteSettings.president.photo = (typeof window !== 'undefined' && window.CAF_PHOTO_PRESIDENT_DATA_URI) ? window.CAF_PHOTO_PRESIDENT_DATA_URI : DEFAULT_SETTINGS.president.photo;
       }
-      if (!siteSettings.secretary.photo || siteSettings.secretary.photo === '') {
-        siteSettings.secretary.photo = DEFAULT_SETTINGS.secretary.photo;
+      if (!siteSettings.secretary.photo || siteSettings.secretary.photo === '' || siteSettings.secretary.photo.includes('leader_masum.png')) {
+        siteSettings.secretary.photo = (typeof window !== 'undefined' && window.CAF_PHOTO_SECRETARY_DATA_URI) ? window.CAF_PHOTO_SECRETARY_DATA_URI : DEFAULT_SETTINGS.secretary.photo;
       }
       if (!siteSettings.donation) {
         siteSettings.donation = { ...DEFAULT_SETTINGS.donation };
@@ -6065,8 +6064,9 @@ function applySiteSettings() {
     if (nameEl) nameEl.textContent = p.name || 'হালিম দেওয়ান';
     if (titleEl) titleEl.textContent = p.title || 'সভাপতি, চাঁদের আলো ফাউন্ডেশন';
     if (msgEl) msgEl.textContent = p.message || '';
-    if (p.photo && imgEl && avatarEl) {
-      imgEl.src = p.photo;
+    const presPhoto = p.photo || (typeof window !== 'undefined' ? window.CAF_PHOTO_PRESIDENT_DATA_URI : null) || DEFAULT_SETTINGS.president.photo;
+    if (presPhoto && imgEl && avatarEl) {
+      imgEl.src = presPhoto;
       imgEl.classList.remove('hidden');
       avatarEl.classList.add('hidden');
     } else if (imgEl && avatarEl) {
@@ -6087,8 +6087,9 @@ function applySiteSettings() {
     if (nameEl) nameEl.textContent = s.name || 'মোঃ মাসুম শিকদার';
     if (titleEl) titleEl.textContent = s.title || 'সাধারণ সম্পাদক, চাঁদের আলো ফাউন্ডেশন';
     if (msgEl) msgEl.textContent = s.message || '';
-    if (s.photo && imgEl && avatarEl) {
-      imgEl.src = s.photo;
+    const secPhoto = s.photo || (typeof window !== 'undefined' ? window.CAF_PHOTO_SECRETARY_DATA_URI : null) || DEFAULT_SETTINGS.secretary.photo;
+    if (secPhoto && imgEl && avatarEl) {
+      imgEl.src = secPhoto;
       imgEl.classList.remove('hidden');
       avatarEl.classList.add('hidden');
     } else if (imgEl && avatarEl) {
