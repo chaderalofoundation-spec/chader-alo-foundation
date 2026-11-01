@@ -6897,12 +6897,20 @@ function switchAdminModule(modId) {
   modules.forEach(m => {
     const box = document.getElementById('adm-box-' + m);
     const tab = document.getElementById('adm-mod-' + m);
-    if (box) box.classList.add('hidden');
+    if (box) {
+      box.classList.add('hidden');
+      box.classList.remove('block');
+      box.style.display = 'none';
+    }
     if (tab) tab.classList.remove('active');
   });
   const activeBox = document.getElementById('adm-box-' + modId);
   const activeTab = document.getElementById('adm-mod-' + modId);
-  if (activeBox) activeBox.classList.remove('hidden');
+  if (activeBox) {
+    activeBox.classList.remove('hidden');
+    activeBox.classList.add('block');
+    activeBox.style.display = 'block';
+  }
   if (activeTab) activeTab.classList.add('active');
 
   if (modId === 'gallery') renderAdminGalleryGrid();
