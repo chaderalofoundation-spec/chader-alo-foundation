@@ -378,7 +378,7 @@ var realtimeChannel = null;
 var isSyncingFromCloud = false;
 var SUPABASE_CONFIG = {
   url: "https://evnqybxfdzrvormdyutu.supabase.co",
-  anonKey: "sb_publishable_...",
+  anonKey: "",  // << অ্যাডমিন প্যানেল > ক্লাউড ডেটাবেজ থেকে Publishable Key সেট করুন
   enabled: true
 };
 
@@ -919,13 +919,16 @@ function handleVolunteerSubmit(e) {
     return;
   }
 
-  // Duplicate Check: একটি মোবাইল নম্বর দিয়ে একবারই নিবন্ধন
-  const isDuplicate = volunteers.some(v => normalizePhoneNumber(v.phone) === phone);
-  if (isDuplicate) {
+  // Duplicate Check: একই নম্বরে রক্তদাতা বা স্বেচ্ছাসেবী যেকোনো তালিকায় দ্বিতীয়বার নিবন্ধন বন্ধ
+  const isDupVol = volunteers.some(v => normalizePhoneNumber(v.phone) === phone);
+  const isDupDonorForVol = donors.some(d => normalizePhoneNumber(d.phone) === phone);
+  if (isDupVol || isDupDonorForVol) {
     Swal.fire({
       icon: 'warning',
       title: 'ইতিমধ্যে নিবন্ধিত!',
-      text: 'এই মোবাইল নম্বরটি ইতিমধ্যে নিবন্ধিত। অনুগ্রহ করে অন্য নম্বর ব্যবহার করুন অথবা অ্যাডমিনের সঙ্গে যোগাযোগ করুন।',
+      text: isDupDonorForVol
+        ? 'এই মোবাইল নম্বরটি ইতিমধ্যে রক্তদাতা হিসেবে নিবন্ধিত। অনুগ্রহ করে অন্য নম্বর ব্যবহার করুন।'
+        : 'এই মোবাইল নম্বরটি ইতিমধ্যে স্বেচ্ছাসেবী হিসেবে নিবন্ধিত। অনুগ্রহ করে অন্য নম্বর ব্যবহার করুন অথবা অ্যাডমিনের সঙ্গে যোগাযোগ করুন।',
       confirmButtonColor: '#1b8040'
     });
     return;
@@ -1478,13 +1481,16 @@ function handleRegistrationSubmit(e) {
     return;
   }
 
-  // Duplicate Check: একটি মোবাইল নম্বর দিয়ে একবারই নিবন্ধন
-  const isDuplicate = donors.some(d => normalizePhoneNumber(d.phone) === phone);
-  if (isDuplicate) {
+  // Duplicate Check: একই নম্বরে রক্তদাতা বা স্বেচ্ছাসেবী যেকোনো তালিকায় দ্বিতীয়বার নিবন্ধন বন্ধ
+  const isDupDnr = donors.some(d => normalizePhoneNumber(d.phone) === phone);
+  const isDupVolForDnr = volunteers.some(v => normalizePhoneNumber(v.phone) === phone);
+  if (isDupDnr || isDupVolForDnr) {
     Swal.fire({
       icon: 'warning',
       title: 'ইতিমধ্যে নিবন্ধিত!',
-      text: 'এই মোবাইল নম্বরটি ইতিমধ্যে নিবন্ধিত। অনুগ্রহ করে অন্য নম্বর ব্যবহার করুন অথবা অ্যাডমিনের সঙ্গে যোগাযোগ করুন।',
+      text: isDupVolForDnr
+        ? 'এই মোবাইল নম্বরটি ইতিমধ্যে স্বেচ্ছাসেবী হিসেবে নিবন্ধিত। অনুগ্রহ করে অন্য নম্বর ব্যবহার করুন।'
+        : 'এই মোবাইল নম্বরটি ইতিমধ্যে রক্তদাতা হিসেবে নিবন্ধিত। অনুগ্রহ করে অন্য নম্বর ব্যবহার করুন অথবা অ্যাডমিনের সঙ্গে যোগাযোগ করুন।',
       confirmButtonColor: '#dc2626'
     });
     return;
@@ -1623,11 +1629,30 @@ function updateUrgentBanner() {
 // -------------------------------------------------------------
 // ADMIN DASHBOARD ENGINE
 // -------------------------------------------------------------
-function checkAdminSession() {
+async function checkAdminSession() {
+  // First try Supabase Auth session (most secure)
+  if (isSupabaseReady()) {
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session && session.user) {
+        isAdminLoggedIn = true;
+        sessionStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, 'true');
+        const gate = document.getElementById('admin-login-gate');
+        const dash = document.getElementById('admin-dashboard-view');
+        if (gate) gate.classList.add('hidden');
+        if (dash) dash.classList.remove('hidden');
+        updateAdminDashboard();
+        return;
+      }
+    } catch(e) { console.warn('Supabase session check failed:', e); }
+  }
+  // Fallback: sessionStorage PIN session
   if (sessionStorage.getItem(STORAGE_KEYS.ADMIN_AUTH) === 'true') {
     isAdminLoggedIn = true;
-    document.getElementById('admin-login-gate').classList.add('hidden');
-    document.getElementById('admin-dashboard-view').classList.remove('hidden');
+    const gate = document.getElementById('admin-login-gate');
+    const dash = document.getElementById('admin-dashboard-view');
+    if (gate) gate.classList.add('hidden');
+    if (dash) dash.classList.remove('hidden');
     updateAdminDashboard();
   }
 }
@@ -1696,7 +1721,12 @@ function handleAdminTabClick() {
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
             ২৫৬-বিট সুরক্ষিত নিয়ন্ত্রণ ব্যবস্থা
           </div>
-          <p class="text-xs text-slate-300 font-bold mb-3">চাঁদের আলো ফাউন্ডেশনের সেন্ট্রাল সিস্টেমে প্রবেশের জন্য ৪ ডিজিটের এডমিন পিন কোড দিন:</p>
+          <p class="text-xs text-slate-300 font-bold mb-3">Supabase Auth দিয়ে লগইন: ইমেইল + পাসওয়ার্ড দিন। অথবা শুধু নিচে অফলাইন PIN দিন:</p>
+          <div class="relative max-w-xs mx-auto mb-2">
+            <input type="email" id="swal-admin-email" 
+                   class="w-full text-center text-sm bg-slate-800 text-slate-100 border border-slate-600 rounded-lg py-2 px-3 focus:outline-none focus:border-emerald-400 placeholder-slate-500" 
+                   placeholder="admin@example.com (ঐচ্ছিক)">
+          </div>
           
           <div class="relative max-w-xs mx-auto mb-3 admin-3d-screen p-1.5">
             <input type="password" id="swal-admin-pin" maxlength="8" 
@@ -1732,12 +1762,31 @@ function handleAdminTabClick() {
         const inp = document.getElementById('swal-admin-pin');
         if (inp) inp.focus();
       },
-      preConfirm: () => {
+      preConfirm: async () => {
         const pin = document.getElementById('swal-admin-pin').value.trim();
         if (!pin) {
           Swal.showValidationMessage('অনুগ্রহ করে পিন কোড প্রদান করুন');
           return false;
         }
+        // If Supabase is ready, try email+PIN as password login
+        if (isSupabaseReady()) {
+          const emailEl = document.getElementById('swal-admin-email');
+          const email = emailEl ? emailEl.value.trim() : '';
+          if (email) {
+            try {
+              const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pin });
+              if (error) {
+                Swal.showValidationMessage('ইমেইল বা পাসওয়ার্ড ভুল! পুনরায় চেষ্টা করুন।');
+                return false;
+              }
+              return true; // Supabase auth success
+            } catch(e) {
+              Swal.showValidationMessage('সংযোগ সমস্যা। পুনরায় চেষ্টা করুন।');
+              return false;
+            }
+          }
+        }
+        // Fallback: local PIN check
         if (pin !== adminPin) {
           Swal.showValidationMessage('ভুল পিন কোড! সঠিক পিন দিন।');
           return false;
@@ -1767,9 +1816,13 @@ function handleAdminTabClick() {
   }
 }
 
-function adminLogout() {
+async function adminLogout() {
   isAdminLoggedIn = false;
   sessionStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
+  // Sign out from Supabase Auth if connected
+  if (isSupabaseReady()) {
+    try { await supabaseClient.auth.signOut(); } catch(e) { console.warn('Supabase signOut error:', e); }
+  }
   applyAdminUIState();
   const gate = document.getElementById('admin-login-gate');
   const dash = document.getElementById('admin-dashboard-view');
@@ -4121,12 +4174,12 @@ const STORAGE_KEYS_CLOUD = {
 if (!SUPABASE_CONFIG) {
   SUPABASE_CONFIG = {
     url: "https://evnqybxfdzrvormdyutu.supabase.co",
-    anonKey: "sb_publishable_...",
+    anonKey: "",
     enabled: true
   };
 } else {
   if (!SUPABASE_CONFIG.url) SUPABASE_CONFIG.url = "https://evnqybxfdzrvormdyutu.supabase.co";
-  if (!SUPABASE_CONFIG.anonKey) SUPABASE_CONFIG.anonKey = "sb_publishable_...";
+  if (!SUPABASE_CONFIG.anonKey) SUPABASE_CONFIG.anonKey = "";
   SUPABASE_CONFIG.enabled = true;
 }
 
@@ -4134,34 +4187,41 @@ if (!SUPABASE_CONFIG) {
 const EMBEDDED_SUPABASE_SCHEMA_SQL = "-- ==============================================================================\n-- চাঁদের আলো ফাউন্ডেশন (Chader Alo Foundation)\n-- Supabase PostgreSQL Cloud Database Schema & Row Level Security (RLS) Setup\n-- ==============================================================================\n\n-- 1. Enable UUID Extension (if needed)\nCREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\n\n-- ------------------------------------------------------------------------------\n-- 2. CREATE TABLES\n-- ------------------------------------------------------------------------------\n\n-- Table: Blood Donors (রক্তদাতা তালিকা)\nCREATE TABLE IF NOT EXISTS public.donors (\n    id TEXT PRIMARY KEY,\n    name TEXT NOT NULL,\n    father TEXT DEFAULT '',\n    blood_group TEXT NOT NULL,\n    dob TEXT DEFAULT '',\n    gender TEXT DEFAULT 'পুরুষ',\n    weight NUMERIC DEFAULT 0,\n    phone TEXT NOT NULL,\n    whatsapp TEXT DEFAULT '',\n    upazila TEXT DEFAULT 'গজারিয়া',\n    village TEXT DEFAULT '',\n    has_donated TEXT DEFAULT 'হ্যাঁ',\n    last_donation_date TEXT DEFAULT '',\n    donation_count INTEGER DEFAULT 0,\n    verified BOOLEAN DEFAULT TRUE,\n    status TEXT DEFAULT 'active',\n    photo TEXT DEFAULT '',\n    is_demo BOOLEAN DEFAULT FALSE,\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Volunteers (স্বেচ্ছাসেবী কর্নার)\nCREATE TABLE IF NOT EXISTS public.volunteers (\n    id TEXT PRIMARY KEY,\n    name TEXT NOT NULL,\n    father TEXT DEFAULT '',\n    blood_group TEXT DEFAULT '',\n    dob TEXT DEFAULT '',\n    profession TEXT DEFAULT '',\n    phone TEXT NOT NULL,\n    whatsapp TEXT DEFAULT '',\n    upazila TEXT DEFAULT 'গজারিয়া',\n    village TEXT DEFAULT '',\n    interest TEXT DEFAULT '',\n    photo TEXT DEFAULT '',\n    status TEXT DEFAULT 'active',\n    joined_date TEXT DEFAULT '',\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Emergency Blood Requests (জরুরি রক্তের আবেদন)\nCREATE TABLE IF NOT EXISTS public.emergency_requests (\n    id TEXT PRIMARY KEY,\n    patient_name TEXT NOT NULL,\n    blood_group TEXT NOT NULL,\n    bags TEXT DEFAULT '1',\n    time TEXT DEFAULT 'জরুরি',\n    hospital TEXT DEFAULT '',\n    contact TEXT DEFAULT '',\n    phone TEXT NOT NULL,\n    reason TEXT DEFAULT '',\n    urgency TEXT DEFAULT 'জরুরি',\n    status TEXT DEFAULT 'active', -- active, managed, cancelled\n    managed_date TEXT DEFAULT '',\n    donor_name TEXT DEFAULT '',\n    donor_phone TEXT DEFAULT '',\n    notes TEXT DEFAULT '',\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Notice Board (নোটিশ ও সার্কুলার)\nCREATE TABLE IF NOT EXISTS public.notices (\n    id TEXT PRIMARY KEY,\n    title TEXT NOT NULL,\n    category TEXT NOT NULL,\n    date TEXT DEFAULT '',\n    priority TEXT DEFAULT 'normal', -- normal, urgent, pinned\n    author TEXT DEFAULT 'পরিচালনা পরিষদ',\n    signee_role TEXT DEFAULT 'সভাপতি',\n    status TEXT DEFAULT 'active',\n    summary TEXT DEFAULT '',\n    content TEXT NOT NULL,\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Activities & Gallery (গ্যালারি ও সামাজিক কর্মকাণ্ড)\nCREATE TABLE IF NOT EXISTS public.activities (\n    id TEXT PRIMARY KEY,\n    title TEXT NOT NULL,\n    category TEXT NOT NULL,\n    media_type TEXT DEFAULT 'image', -- image, video\n    media_url TEXT DEFAULT '',\n    date TEXT DEFAULT '',\n    location TEXT DEFAULT '',\n    description TEXT DEFAULT '',\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Aid & Service Applications (মানবকল্যাণ ও সেবামূলক আবেদন)\nCREATE TABLE IF NOT EXISTS public.aid_applications (\n    id TEXT PRIMARY KEY,\n    service_name TEXT NOT NULL,\n    name TEXT NOT NULL,\n    phone TEXT NOT NULL,\n    address TEXT DEFAULT '',\n    details TEXT DEFAULT '',\n    status TEXT DEFAULT 'pending', -- pending, approved, rejected\n    submitted_at TEXT DEFAULT '',\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Donation Records (রক্তদান সম্পন্ন ইতিহাস)\nCREATE TABLE IF NOT EXISTS public.donation_records (\n    id TEXT PRIMARY KEY,\n    request_id TEXT DEFAULT '',\n    patient_name TEXT DEFAULT '',\n    patient_phone TEXT DEFAULT '',\n    hospital TEXT DEFAULT '',\n    blood_group TEXT DEFAULT '',\n    bags TEXT DEFAULT '1',\n    donor_name TEXT DEFAULT '',\n    donor_phone TEXT DEFAULT '',\n    donor_address TEXT DEFAULT '',\n    donation_date TEXT DEFAULT '',\n    managed_date TEXT DEFAULT '',\n    notes TEXT DEFAULT '',\n    status TEXT DEFAULT 'managed',\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Site Settings (ওয়েবসাইট কনফিগারেশন)\nCREATE TABLE IF NOT EXISTS public.site_settings (\n    key TEXT PRIMARY KEY,\n    value JSONB NOT NULL,\n    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Global Visitor Counter (ভিজিটর কাউন্টার)\nCREATE TABLE IF NOT EXISTS public.visitor_counter (\n    id TEXT PRIMARY KEY DEFAULT 'main',\n    count BIGINT DEFAULT 1,\n    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- ------------------------------------------------------------------------------\n-- 3. ROW LEVEL SECURITY (RLS) POLICIES\n-- ------------------------------------------------------------------------------\n\n-- Enable RLS on all tables\nALTER TABLE public.donors ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.volunteers ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.emergency_requests ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.notices ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.activities ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.aid_applications ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.donation_records ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.visitor_counter ENABLE ROW LEVEL SECURITY;\n\n-- Clean existing policies (idempotent setup)\nDO $$\nBEGIN\n    DROP POLICY IF EXISTS \"Public can view donors\" ON public.donors;\n    DROP POLICY IF EXISTS \"Public can register as donor\" ON public.donors;\n    DROP POLICY IF EXISTS \"Admins can update donors\" ON public.donors;\n    DROP POLICY IF EXISTS \"Admins can delete donors\" ON public.donors;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.donors;\n\n    DROP POLICY IF EXISTS \"Public can view volunteers\" ON public.volunteers;\n    DROP POLICY IF EXISTS \"Public can register as volunteer\" ON public.volunteers;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.volunteers;\n\n    DROP POLICY IF EXISTS \"Public can view emergency_requests\" ON public.emergency_requests;\n    DROP POLICY IF EXISTS \"Public can create emergency request\" ON public.emergency_requests;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.emergency_requests;\n\n    DROP POLICY IF EXISTS \"Public can view notices\" ON public.notices;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.notices;\n\n    DROP POLICY IF EXISTS \"Public can view activities\" ON public.activities;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.activities;\n\n    DROP POLICY IF EXISTS \"Public can submit aid application\" ON public.aid_applications;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.aid_applications;\n\n    DROP POLICY IF EXISTS \"Public can view donation_records\" ON public.donation_records;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.donation_records;\n\n    DROP POLICY IF EXISTS \"Public can view site_settings\" ON public.site_settings;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.site_settings;\n\n    DROP POLICY IF EXISTS \"Public can view visitor_counter\" ON public.visitor_counter;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.visitor_counter;\nEND $$;\n\n-- A. PUBLIC READ POLICIES (সবার জন্য উন্মুক্ত প্রদর্শন)\nCREATE POLICY \"Public can view donors\" ON public.donors FOR SELECT USING (true);\nCREATE POLICY \"Public can view volunteers\" ON public.volunteers FOR SELECT USING (true);\nCREATE POLICY \"Public can view emergency_requests\" ON public.emergency_requests FOR SELECT USING (true);\nCREATE POLICY \"Public can view notices\" ON public.notices FOR SELECT USING (true);\nCREATE POLICY \"Public can view activities\" ON public.activities FOR SELECT USING (true);\nCREATE POLICY \"Public can view donation_records\" ON public.donation_records FOR SELECT USING (true);\nCREATE POLICY \"Public can view site_settings\" ON public.site_settings FOR SELECT USING (true);\nCREATE POLICY \"Public can view visitor_counter\" ON public.visitor_counter FOR SELECT USING (true);\n\n-- B. PUBLIC INSERT POLICIES (ওয়েবসাইটে ভিজিটররা সরাসরি যেসব আবেদন করতে পারবেন)\nCREATE POLICY \"Public can register as donor\" ON public.donors FOR INSERT WITH CHECK (true);\nCREATE POLICY \"Public can register as volunteer\" ON public.volunteers FOR INSERT WITH CHECK (true);\nCREATE POLICY \"Public can create emergency request\" ON public.emergency_requests FOR INSERT WITH CHECK (true);\nCREATE POLICY \"Public can submit aid application\" ON public.aid_applications FOR INSERT WITH CHECK (true);\n\n-- C. ADMIN POLICIES (লগইন করা অ্যাডমিনদের জন্য সম্পূর্ণ নিয়ন্ত্রণ)\n-- When Admin signs in with Supabase Auth (authenticated role):\nCREATE POLICY \"Full access to authenticated on donors\" ON public.donors FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on volunteers\" ON public.volunteers FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on emergency_requests\" ON public.emergency_requests FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on notices\" ON public.notices FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on activities\" ON public.activities FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on aid_applications\" ON public.aid_applications FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on donation_records\" ON public.donation_records FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on site_settings\" ON public.site_settings FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on visitor_counter\" ON public.visitor_counter FOR ALL TO authenticated USING (true) WITH CHECK (true);\n\n-- D. ANON PERMISSIVE POLICIES FOR DIRECT PIN ADMIN ACCESS\n-- Note: Allows frontend CRUD operations using Anon Key while maintaining client-side Admin PIN verification.\nCREATE POLICY \"Allow anon update and delete on donors\" ON public.donors FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update and delete on volunteers\" ON public.volunteers FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update and delete on emergency_requests\" ON public.emergency_requests FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update and delete on notices\" ON public.notices FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update and delete on activities\" ON public.activities FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon select and update on aid_applications\" ON public.aid_applications FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update and delete on donation_records\" ON public.donation_records FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update on site_settings\" ON public.site_settings FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update on visitor_counter\" ON public.visitor_counter FOR ALL TO anon USING (true) WITH CHECK (true);\n\n-- ------------------------------------------------------------------------------\n-- 4. REALTIME REPLICATION (এক ডিভাইসের পরিবর্তন অন্য ডিভাইসে স্বয়ংক্রিয় রিয়েলটাইম আপডেট)\n-- ------------------------------------------------------------------------------\nALTER PUBLICATION supabase_realtime ADD TABLE public.donors;\nALTER PUBLICATION supabase_realtime ADD TABLE public.volunteers;\nALTER PUBLICATION supabase_realtime ADD TABLE public.emergency_requests;\nALTER PUBLICATION supabase_realtime ADD TABLE public.notices;\nALTER PUBLICATION supabase_realtime ADD TABLE public.activities;\nALTER PUBLICATION supabase_realtime ADD TABLE public.aid_applications;\nALTER PUBLICATION supabase_realtime ADD TABLE public.donation_records;\nALTER PUBLICATION supabase_realtime ADD TABLE public.site_settings;\nALTER PUBLICATION supabase_realtime ADD TABLE public.visitor_counter;\n\n-- ------------------------------------------------------------------------------\n-- 5. ATOMIC VISITOR INCREMENT FUNCTION (নিরাপদ ভিজিটর কাউন্টার)\n-- ------------------------------------------------------------------------------\nCREATE OR REPLACE FUNCTION public.increment_visitor_count()\nRETURNS BIGINT AS $$\nDECLARE\n  new_count BIGINT;\nBEGIN\n  INSERT INTO public.visitor_counter (id, count)\n  VALUES ('main', 1)\n  ON CONFLICT (id)\n  DO UPDATE SET count = public.visitor_counter.count + 1, updated_at = NOW()\n  RETURNING count INTO new_count;\n  RETURN new_count;\nEND;\n$$ LANGUAGE plpgsql SECURITY DEFINER;\n\n-- ------------------------------------------------------------------------------\n-- 6. SEED INITIAL DATA (প্রাথমিক ডিফল্ট ডেটা যা কখনোই হারাবে না)\n-- ------------------------------------------------------------------------------\n\n-- Seed Donors (হালিম দেওয়ান ও মোঃ মাসুম শিকদার)\nINSERT INTO public.donors (id, name, father, blood_group, dob, gender, weight, phone, whatsapp, upazila, village, has_donated, last_donation_date, donation_count, verified, status, photo, is_demo)\nVALUES \n(\n  'CAF-BD-1001',\n  'হালিম দেওয়ান',\n  '',\n  'B+',\n  '1980-01-01',\n  'পুরুষ',\n  70,\n  '01914927933',\n  '01914927933',\n  'গজারিয়া',\n  'কলেজ রোড',\n  'হ্যাঁ',\n  '2026-03-25',\n  5,\n  true,\n  'active',\n  'assets/leader_halim.jpg',\n  false\n),\n(\n  'CAF-BD-1002',\n  'মোঃ মাসুম শিকদার',\n  '',\n  'A+',\n  '1985-05-10',\n  'পুরুষ',\n  68,\n  '01785677062',\n  '01785677062',\n  'গজারিয়া',\n  'হোগলাকান্দি, ভবেরচর, কলেজ রোড',\n  'হ্যাঁ',\n  '2026-08-02',\n  21,\n  true,\n  'active',\n  'assets/leader_masum.png',\n  false\n)\nON CONFLICT (id) DO NOTHING;\n\n-- Seed Notices (৩টি অফিসিয়াল ডিফল্ট নোটিশ)\nINSERT INTO public.notices (id, title, category, date, priority, author, signee_role, status, summary, content)\nVALUES\n(\n  'NOT-2026-001',\n  'বিনামূল্যে রক্তের গ্রুপ নির্ণয় ও স্বেচ্ছায় রক্তদান ক্যাম্পেইন-২০২৬',\n  'রক্তদান কর্মসূচি',\n  '2026-10-25',\n  'pinned',\n  'হালিম দেওয়ান (সভাপতি)',\n  'সভাপতি',\n  'active',\n  'আগামী শুক্রবার ভবেরচর কলেজ রোড প্রাঙ্গণে দিনব্যাপী বিনামূল্যে রক্তের গ্রুপ নির্ণয় ও রক্তদান ক্যাম্পেইন অনুষ্ঠিত হবে।',\n  'চাঁদের আলো ফাউন্ডেশনের সকল শুভাকাঙ্ক্ষী ও এলাকাবাসীর সদয় অবগতির জন্য জানানো যাচ্ছে যে, আর্ত মানবতার সেবায় নিয়মিত কর্মসূচির অংশ হিসেবে আগামী শুক্রবার সকাল ৯:০০ টা থেকে বিকেল ৫:০০ টা পর্যন্ত ভবেরচর কলেজ রোডস্থ অস্থায়ী কার্যালয়ে এক বিশাল ''বিনামূল্যে রক্তের গ্রুপ নির্ণয় ও স্বেচ্ছায় রক্তদান কর্মসূচি-২০২৬'' অনুষ্ঠিত হবে।\\n\\nউক্ত ক্যাম্পেইনে উপস্থিত থাকবেন গজারিয়া উপজেলার বিশিষ্ট সমাজসেবক, চিকিৎসকবৃন্দ ও ফাউন্ডেশনের কার্যনির্বাহী পরিষদের নেতৃবৃন্দ। ১৮ থেকে ৬০ বছর বয়সী সকল সুস্থ ব্যক্তিকে এই মহৎ রক্তদান কর্মসূচিতে অংশগ্রহণ করে মুমূর্ষু রোগীর পাশে দাঁড়ানোর উদাত্ত আহ্বান জানানো হচ্ছে।'\n),\n(\n  'NOT-2026-002',\n  'শীতার্ত ও সুবিধাবঞ্চিত মানুষের মাঝে শীতবস্ত্র বিতরণ সংক্রান্ত জরুরি বিজ্ঞপ্তি',\n  'সমাজকল্যাণ',\n  '2026-10-20',\n  'urgent',\n  'মোঃ মাসুম শিকদার (সাধারণ সম্পাদক)',\n  'সাধারণ সম্পাদক',\n  'active',\n  'আসন্ন শীত মৌসুমে অসহায় ও দরিদ্র পরিবারের মাঝে কম্বল ও শীতবস্ত্র বিতরণের তালিকা প্রস্তুত কার্যক্রম শুরু হয়েছে।',\n  'চাঁদের আলো ফাউন্ডেশনের উদ্যোগে আগামী মাসে গজারিয়া উপজেলার বিভিন্ন ইউনিয়নের প্রত্যন্ত অঞ্চলে অসহায় বিধবা, এতিম ও দরিদ্র পরিবারের মাঝে শীতবস্ত্র ও কম্বল বিতরণ কর্মসূচি পরিচালিত হবে।\\n\\nফাউন্ডেশনের সকল ইউনিয়ন ও ওয়ার্ড পর্যায়ের স্বেচ্ছাসেবীদের আগামী ৫ নভেম্বরের মধ্যে নিজ নিজ এলাকার প্রকৃত অসচ্ছল পরিবারের তালিকা প্রস্তুত করে সাধারণ সম্পাদকের নিকট জমা দেওয়ার জন্য নির্দেশ প্রদান করা হলো। যেকোনো তথ্যের জন্য সরাসরি হেল্পলাইনে (০১৯১৪-৯২৭৯৩৩) যোগাযোগ করার অনুরোধ করা হলো।'\n),\n(\n  'NOT-2026-003',\n  'ফাউন্ডেশনের আজীবন ও সাধারণ সদস্যপদ গ্রহণ নীতিমালা ও ফরম বিতরণ',\n  'সাধারণ নোটিশ',\n  '2026-10-10',\n  'normal',\n  'কার্যনির্বাহী পরিষদ (যৌথ)',\n  'সাধারণ সম্পাদক',\n  'active',\n  'চাঁদের আলো ফাউন্ডেশনের গঠনতন্ত্রের ধারা-০৫ মোতাবেক নতুন সদস্যপদ গ্রহণের আবেদন আহ্বান করা যাচ্ছে।',\n  'চাঁদের আলো ফাউন্ডেশনের গঠনতন্ত্র অনুযায়ী যারা আর্ত মানবতার সেবায় আত্মনিয়োগ করতে চান, তাদের জন্য আজীবন সদস্য ও সাধারণ সদস্যপদ গ্রহণের আবেদন উন্মুক্ত করা হয়েছে।\\n\\nআগ্রহী ব্যক্তিবর্গ ওয়েবসাইট অথবা কেন্দ্রীয় কার্যালয় (বিসমিল্লাহ ভবন, কলেজ রোড, ভবেরচর) থেকে সদস্যপদ ফরম সংগ্রহ ও পূরণ করে জমা দিতে পারবেন। আজীবন সদস্যপদের এককালীন অনুদান ১০,০০০/- টাকা এবং সাধারণ সদস্যপদের মাসিক ফি ১০০/- টাকা নির্ধারণ করা আছে।'\n)\nON CONFLICT (id) DO NOTHING;\n\n-- Seed Activities (গ্যালারির ডিফল্ট ছবি ও তথ্য)\nINSERT INTO public.activities (id, title, category, media_type, media_url, date, location, description)\nVALUES\n(\n  'ACT-01',\n  'গজারিয়ায় বিনামূল্যে রক্তের গ্রুপ নির্ণয়',\n  'রক্তদান',\n  'image',\n  'assets/activity_blood.jpg',\n  '2021-11-14',\n  'কালীপুরা এনএস কান্দি সরকারি প্রাথমিক বিদ্যালয়, ইমামপুর, গজারিয়া',\n  'মুন্সীগঞ্জের গজারিয়া উপজেলার ইমামপুর ইউনিয়নের কালীপুরা এনএস কান্দি সরকারি প্রাথমিক বিদ্যালয়ে চাঁদের আলো ফাউন্ডেশনের উদ্যোগে দিনব্যাপী বিনামূল্যে রক্তের গ্রুপ নির্ণয় ও স্বাস্থ্য সচেতনতামূলক কর্মসূচি অনুষ্ঠিত হয়। এতে চার শতাধিক মানুষের রক্তের গ্রুপ নির্ণয় করা হয়।'\n),\n(\n  'ACT-02',\n  'অসহায় ও শীতার্ত মানুষের মাঝে শীতবস্ত্র বিতরণ',\n  'ত্রাণ',\n  'image',\n  '',\n  '2022-01-10',\n  'হোগলাকান্দি, গজারিয়া',\n  'শীত মৌসুমে হতদরিদ্র পরিবারের মাঝে কম্বল ও গরম কাপড় বিতরণ কর্মসূচি।'\n),\n(\n  'ACT-03',\n  'মাসব্যাপী বৃক্ষরোপণ কর্মসূচি-২০২১',\n  'বৃক্ষরোপণ',\n  'image',\n  'assets/activity_tree.jpg',\n  '2021-07-06',\n  'গজারিয়া, মুন্সীগঞ্জ',\n  'পরিবেশের ভারসাম্য রক্ষা ও সবুজায়নের লক্ষ্যে চাঁদের আলো ফাউন্ডেশনের উদ্যোগে মাসব্যাপী বৃক্ষরোপণ কর্মসূচি-২০২১ পরিচালিত হয় এবং বিভিন্ন প্রতিষ্ঠানে ফলজ ও বনজ গাছের চারা রোপণ করা হয়।'\n)\nON CONFLICT (id) DO NOTHING;\n\n-- Initial Visitor Counter Row\nINSERT INTO public.visitor_counter (id, count)\nVALUES ('main', 1)\nON CONFLICT (id) DO NOTHING;\n";
 
 function getSupabaseConfig() {
+  // URL is hardcoded — always use it
+  SUPABASE_CONFIG.url = "https://evnqybxfdzrvormdyutu.supabase.co";
+  // Load saved key from localStorage (set via Admin Panel — works across browser sessions)
   try {
     const saved = localStorage.getItem(STORAGE_KEYS_CLOUD.SUPABASE_CONFIG);
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (parsed) {
-        if (parsed.url) SUPABASE_CONFIG.url = parsed.url;
-        if (parsed.anonKey) SUPABASE_CONFIG.anonKey = parsed.anonKey;
+      if (parsed && parsed.anonKey && parsed.anonKey.length > 20) {
+        SUPABASE_CONFIG.anonKey = parsed.anonKey;
       }
     }
   } catch(e) {}
-  if (!SUPABASE_CONFIG.url) {
-    SUPABASE_CONFIG.url = "https://evnqybxfdzrvormdyutu.supabase.co";
-  }
-  if (!SUPABASE_CONFIG.anonKey) {
-    SUPABASE_CONFIG.anonKey = "sb_publishable_...";
-  }
   SUPABASE_CONFIG.enabled = !!(SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey);
   return SUPABASE_CONFIG;
 }
 
 function isSupabaseReady() {
-  return supabaseClient !== null && SUPABASE_CONFIG.enabled && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey;
+  const key = SUPABASE_CONFIG.anonKey || '';
+  // Valid Supabase keys: either new "sb_publishable_..." format (>20 chars) or JWT format starting with "eyJ"
+  // Reject only empty, placeholder "sb_publishable_..." (literal), or too-short keys
+  const PLACEHOLDER = 'sb_publishable_...';
+  const isEmpty = !key || key.trim() === '';
+  const isLiteral = key === PLACEHOLDER;
+  // A valid new-format key starts with "sb_publishable_" and has more than 30 chars
+  const isNewFormat = key.startsWith('sb_publishable_') && key.length > 30;
+  // A valid JWT key starts with "eyJ" and is >100 chars
+  const isJwtFormat = key.startsWith('eyJ') && key.length > 100;
+  const isValidKey = isNewFormat || isJwtFormat;
+  return supabaseClient !== null && SUPABASE_CONFIG.enabled && !!SUPABASE_CONFIG.url && !isEmpty && !isLiteral && isValidKey;
 }
 
 function initSupabaseClient() {
   getSupabaseConfig();
   if (!SUPABASE_CONFIG.url || !SUPABASE_CONFIG.anonKey) {
-    updateCloudStatusBadge(false, 'লোকাল মোড (ক্লাউড কনফিগারেশন প্রয়োজন)');
+    updateCloudStatusBadge(false, 'লোকাল মোড — অ্যাডমিন প্যানেলে Supabase Key সেট করুন');
     return null;
   }
 
