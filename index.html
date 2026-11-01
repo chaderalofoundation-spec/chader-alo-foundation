@@ -6705,11 +6705,19 @@ function openAddActivityModal() {
   if (placeholder) placeholder.classList.remove('hidden');
   // show photo, hide video
   toggleMediaTypeFields();
-  document.getElementById('activity-modal').classList.remove('hidden');
+  const modal = document.getElementById('activity-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
 }
 
 function closeActivityModal() {
-  document.getElementById('activity-modal').classList.add('hidden');
+  const modal = document.getElementById('activity-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
   activityUploadedPhoto = null;
   editingActivityId = null;
 }
@@ -8251,12 +8259,18 @@ function openNoticeViewModal(id) {
   if (contentEl) contentEl.textContent = n.content || n.summary || '';
 
   const modal = document.getElementById('notice-view-modal');
-  if (modal) modal.classList.remove('hidden');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
 }
 
 function closeNoticeViewModal() {
   const modal = document.getElementById('notice-view-modal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
 }
 
 function printOfficialNotice() {
@@ -8298,12 +8312,18 @@ function openNoticeEditModal(id = null) {
     if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
   }
 
-  if (modal) modal.classList.remove('hidden');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
 }
 
 function closeNoticeEditModal() {
   const modal = document.getElementById('notice-edit-modal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
 }
 
 async function handleNoticeSubmit(e) {
