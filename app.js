@@ -493,6 +493,8 @@ function initApp() {
   updateNoticeStats();
   renderAdminNoticeList();
   applyAdminUIState();
+  initFirebaseClient();
+  setupFirebaseRealtime();
 }
 
 if (document.readyState === 'loading') {
@@ -632,6 +634,17 @@ function loadData() {
     saveDonors();
   }
 
+  // Emergency Requests
+  const rq = localStorage.getItem(STORAGE_KEYS.REQUESTS);
+  if (rq) {
+    try {
+      emergencyRequests = JSON.parse(rq);
+      if (!Array.isArray(emergencyRequests)) emergencyRequests = [];
+    } catch(e) { emergencyRequests = []; }
+  } else {
+    emergencyRequests = [];
+  }
+
   // Volunteers
   const vl = localStorage.getItem(STORAGE_KEYS.VOLUNTEERS);
   if (vl) {
@@ -720,11 +733,13 @@ function loadData() {
 
 function saveDonors() {
   localStorage.setItem(STORAGE_KEYS.DONORS, JSON.stringify(donors));
+  if (typeof cloudBulkUpsertDonors === 'function' && isFirebaseReady()) { cloudBulkUpsertDonors(donors); }
   updateHomeStats();
 }
 
 function saveVolunteers() {
   localStorage.setItem(STORAGE_KEYS.VOLUNTEERS, JSON.stringify(volunteers));
+  if (typeof cloudBulkUpsertVolunteers === 'function' && isFirebaseReady()) { cloudBulkUpsertVolunteers(volunteers); }
   updateHomeStats();
 }
 
@@ -1525,6 +1540,7 @@ function handleEmergencySubmit(e) {
   };
   emergencyRequests.unshift(newReq);
   localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(emergencyRequests));
+  if (typeof cloudUpsertRequest === 'function') { cloudUpsertRequest(newReq); }
 
   document.getElementById('emergency-request-form').reset();
   renderEmergencyRequests();
@@ -4098,48 +4114,409 @@ function renderAdminNoticeList() {
 // ==============================================================================
 
 // ============================================================
-// STANDALONE MODE — Cloud stubs (no external DB connection)
 // ============================================================
-function isFirebaseReady() { return false; }
-function isSupabaseReady() { return false; }
-function updateCloudStatusBadge(c, t) {}
-function updateCloudMetricsUI() {}
-async function cloudUpsertDonor() {}
-async function cloudBulkUpsertDonors() {}
-async function cloudDeleteDonor() {}
-async function cloudUpsertVolunteer() {}
-async function cloudBulkUpsertVolunteers() {}
-async function cloudDeleteVolunteer() {}
-async function cloudUpsertRequest() {}
-async function cloudDeleteRequest() {}
-async function cloudUpsertNotice() { return { success: false, offline: true }; }
-async function cloudBulkUpsertNotices() {}
-async function cloudDeleteNotice() {}
-async function cloudUpsertActivity() {}
-async function cloudBulkUpsertActivities() {}
-async function cloudDeleteActivity() {}
+// FIREBASE REALTIME DATABASE ENGINE & SYNCHRONIZATION
+// ============================================================
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCCPEnuQAqKWNoqfEumlaZpM-4Z-ZHZr3k",
+  authDomain: "chaderalofoundation-2df2e.firebaseapp.com",
+  databaseURL: "https://chaderalofoundation-2df2e-default-rtdb.firebaseio.com",
+  projectId: "chaderalofoundation-2df2e",
+  storageBucket: "chaderalofoundation-2df2e.firebasestorage.app",
+  messagingSenderId: "1034370623909",
+  appId: "1:1034370623909:web:26d23deb7d31f2a607604c"
+};
+
+var firebaseApp = null;
+var realtimeDb = null;
+var isSyncingFromCloud = false;
+
+function initFirebaseClient() {
+  try {
+    if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+      if (!firebase.apps || !firebase.apps.length) {
+        firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+      } else {
+        firebaseApp = firebase.app();
+      }
+      realtimeDb = firebase.database();
+      updateCloudStatusBadge(true, 'অনলাইন — ফায়ারবেস সংযুক্ত');
+      console.log('Firebase Realtime Database initialized successfully.');
+      return true;
+    }
+  } catch(e) {
+    console.warn('Firebase initialization warning:', e);
+    updateCloudStatusBadge(false, 'লোকাল অফলাইন মোড');
+  }
+  return false;
+}
+
+function isFirebaseReady() {
+  return typeof firebase !== 'undefined' && realtimeDb !== null;
+}
+
+function isSupabaseReady() {
+  return isFirebaseReady();
+}
+
+function updateCloudStatusBadge(connected, text) {
+  const badge = document.getElementById('cloud-status-badge');
+  const dot = document.getElementById('cloud-status-dot');
+  const textEl = document.getElementById('cloud-status-text');
+  if (badge) {
+    badge.className = connected 
+      ? 'inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+      : 'inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40';
+  }
+  if (dot) {
+    dot.className = connected ? 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse' : 'w-2 h-2 rounded-full bg-amber-400';
+  }
+  if (textEl) {
+    textEl.textContent = text || (connected ? 'ফায়ারবেস রিয়েলটাইম ডেটাবেজ সক্রিয়' : 'অফলাইন মোড');
+  }
+}
+
+function updateCloudMetricsUI() {
+  const totalSync = document.getElementById('cloud-total-records');
+  if (totalSync) {
+    const total = (donors ? donors.length : 0) + (volunteers ? volunteers.length : 0) + (emergencyRequests ? emergencyRequests.length : 0);
+    totalSync.textContent = toBengaliNumeral(total);
+  }
+}
+
+// -------------------------------------------------------------
+// CLOUD OPERATIONS: EMERGENCY REQUESTS
+// -------------------------------------------------------------
+async function cloudUpsertRequest(req) {
+  if (!isFirebaseReady() || !req || !req.id) return { success: false, offline: true };
+  try {
+    await realtimeDb.ref('requests/' + req.id).set(req);
+    console.log('Request synced to Firebase:', req.id);
+    return { success: true };
+  } catch(e) {
+    console.error('Firebase save request failed:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+async function cloudDeleteRequest(reqId) {
+  if (!isFirebaseReady() || !reqId) return;
+  try {
+    await realtimeDb.ref('requests/' + reqId).remove();
+    console.log('Request deleted from Firebase:', reqId);
+  } catch(e) {
+    console.error('Firebase delete request failed:', e);
+  }
+}
+
+// -------------------------------------------------------------
+// CLOUD OPERATIONS: DONORS
+// -------------------------------------------------------------
+async function cloudUpsertDonor(donor) {
+  if (!isFirebaseReady() || !donor || !donor.id) return { success: false, offline: true };
+  try {
+    await realtimeDb.ref('donors/' + donor.id).set(donor);
+    console.log('Donor synced to Firebase:', donor.id);
+    return { success: true };
+  } catch(e) {
+    console.error('Firebase save donor failed:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+async function cloudBulkUpsertDonors(list) {
+  if (!isFirebaseReady() || !Array.isArray(list)) return;
+  try {
+    const updates = {};
+    list.forEach(d => {
+      if (d && d.id) updates['donors/' + d.id] = d;
+    });
+    await realtimeDb.ref().update(updates);
+    console.log('Donors bulk synced to Firebase.');
+  } catch(e) {
+    console.error('Firebase bulk donors failed:', e);
+  }
+}
+
+async function cloudDeleteDonor(id) {
+  if (!isFirebaseReady() || !id) return;
+  try {
+    await realtimeDb.ref('donors/' + id).remove();
+  } catch(e) {
+    console.error('Firebase delete donor failed:', e);
+  }
+}
+
+// -------------------------------------------------------------
+// CLOUD OPERATIONS: VOLUNTEERS
+// -------------------------------------------------------------
+async function cloudUpsertVolunteer(vol) {
+  if (!isFirebaseReady() || !vol || !vol.id) return { success: false, offline: true };
+  try {
+    await realtimeDb.ref('volunteers/' + vol.id).set(vol);
+    console.log('Volunteer synced to Firebase:', vol.id);
+    return { success: true };
+  } catch(e) {
+    console.error('Firebase save volunteer failed:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+async function cloudBulkUpsertVolunteers(list) {
+  if (!isFirebaseReady() || !Array.isArray(list)) return;
+  try {
+    const updates = {};
+    list.forEach(v => {
+      if (v && v.id) updates['volunteers/' + v.id] = v;
+    });
+    await realtimeDb.ref().update(updates);
+  } catch(e) {
+    console.error('Firebase bulk volunteers failed:', e);
+  }
+}
+
+async function cloudDeleteVolunteer(id) {
+  if (!isFirebaseReady() || !id) return;
+  try {
+    await realtimeDb.ref('volunteers/' + id).remove();
+  } catch(e) {
+    console.error('Firebase delete volunteer failed:', e);
+  }
+}
+
+// -------------------------------------------------------------
+// CLOUD OPERATIONS: NOTICES
+// -------------------------------------------------------------
+async function cloudUpsertNotice(notice) {
+  if (!isFirebaseReady() || !notice || !notice.id) return { success: false, offline: true };
+  try {
+    await realtimeDb.ref('notices/' + notice.id).set(notice);
+    return { success: true };
+  } catch(e) {
+    console.error('Firebase save notice failed:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+async function cloudBulkUpsertNotices(list) {
+  if (!isFirebaseReady() || !Array.isArray(list)) return;
+  try {
+    const updates = {};
+    list.forEach(n => {
+      if (n && n.id) updates['notices/' + n.id] = n;
+    });
+    await realtimeDb.ref().update(updates);
+  } catch(e) {}
+}
+
+async function cloudDeleteNotice(id) {
+  if (!isFirebaseReady() || !id) return;
+  try {
+    await realtimeDb.ref('notices/' + id).remove();
+  } catch(e) {}
+}
+
+// -------------------------------------------------------------
+// CLOUD OPERATIONS: ACTIVITIES & SETTINGS
+// -------------------------------------------------------------
+async function cloudUpsertActivity(act) {
+  if (!isFirebaseReady() || !act || !act.id) return;
+  try {
+    await realtimeDb.ref('activities/' + act.id).set(act);
+  } catch(e) {}
+}
+
+async function cloudBulkUpsertActivities(list) {
+  if (!isFirebaseReady() || !Array.isArray(list)) return;
+  try {
+    const updates = {};
+    list.forEach(a => { if (a && a.id) updates['activities/' + a.id] = a; });
+    await realtimeDb.ref().update(updates);
+  } catch(e) {}
+}
+
+async function cloudDeleteActivity(id) {
+  if (!isFirebaseReady() || !id) return;
+  try {
+    await realtimeDb.ref('activities/' + id).remove();
+  } catch(e) {}
+}
+
+async function cloudSaveSettings(st) {
+  if (!isFirebaseReady() || !st) return;
+  try {
+    await realtimeDb.ref('settings/site').set(st);
+  } catch(e) {}
+}
+
+// -------------------------------------------------------------
+// REALTIME MULTI-DEVICE LISTENERS (LOAD & SYNC)
+// -------------------------------------------------------------
+function setupFirebaseRealtime() {
+  if (!isFirebaseReady()) return;
+
+  try {
+    // 1. Listen to Emergency Requests
+    realtimeDb.ref('requests').on('value', snapshot => {
+      const val = snapshot.val();
+      if (val) {
+        const cloudRequests = Object.values(val);
+        const map = new Map();
+        emergencyRequests.forEach(r => map.set(r.id, r));
+        cloudRequests.forEach(r => map.set(r.id, r));
+        emergencyRequests = Array.from(map.values());
+        localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(emergencyRequests));
+        renderEmergencyRequests();
+        updateUrgentBanner();
+        if (typeof renderAdminEmergencyList === 'function') renderAdminEmergencyList();
+      }
+    });
+
+    // 2. Listen to Donors
+    realtimeDb.ref('donors').on('value', snapshot => {
+      const val = snapshot.val();
+      if (val) {
+        const cloudDonors = Object.values(val);
+        const map = new Map();
+        donors.forEach(d => map.set(d.id, d));
+        cloudDonors.forEach(d => map.set(d.id, d));
+        donors = Array.from(map.values());
+        localStorage.setItem(STORAGE_KEYS.DONORS, JSON.stringify(donors));
+        filterDonors();
+        updateHomeStats();
+        if (typeof renderAdminTable === 'function' && isAdminLoggedIn) renderAdminTable();
+      }
+    });
+
+    // 3. Listen to Volunteers
+    realtimeDb.ref('volunteers').on('value', snapshot => {
+      const val = snapshot.val();
+      if (val) {
+        const cloudVol = Object.values(val);
+        const map = new Map();
+        volunteers.forEach(v => map.set(v.id, v));
+        cloudVol.forEach(v => map.set(v.id, v));
+        volunteers = Array.from(map.values());
+        localStorage.setItem(STORAGE_KEYS.VOLUNTEERS, JSON.stringify(volunteers));
+        renderVolunteersGrid();
+        updateHomeStats();
+        if (typeof renderAdminVolunteersTable === 'function' && isAdminLoggedIn) renderAdminVolunteersTable();
+      }
+    });
+
+    // 4. Listen to Notices
+    realtimeDb.ref('notices').on('value', snapshot => {
+      const val = snapshot.val();
+      if (val) {
+        notices = Object.values(val);
+        localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(notices));
+        renderNoticeBoard();
+        renderHomeNotices();
+        updateNoticeStats();
+        if (typeof renderAdminNoticeList === 'function' && isAdminLoggedIn) renderAdminNoticeList();
+      }
+    });
+
+    console.log('Firebase Realtime listeners attached for requests, donors, volunteers & notices.');
+  } catch(e) {
+    console.error('Error attaching Firebase Realtime listeners:', e);
+  }
+}
+
+// -------------------------------------------------------------
+// ONE-CLICK LOCALSTORAGE TO FIREBASE DATA MIGRATION
+// -------------------------------------------------------------
+async function migrateAllDataToCloud() {
+  if (!isFirebaseReady()) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'ফায়ারবেস সংযোগ পাওয়া যায়নি',
+      text: 'দয়া করে ইন্টারনেট সংযোগ নিশ্চিত করুন এবং পেজ রিফ্রেশ করুন।',
+      confirmButtonColor: '#e11d48'
+    });
+    return;
+  }
+
+  Swal.fire({
+    title: 'ফায়ারবেসে স্থানান্তর চলছে...',
+    text: 'অনুগ্রহ করে অপেক্ষা করুন',
+    allowOutsideClick: false,
+    didOpen: () => Swal.showLoading()
+  });
+
+  try {
+    const updates = {};
+    if (donors && donors.length) {
+      donors.forEach(d => { if (d && d.id) updates['donors/' + d.id] = d; });
+    }
+    if (volunteers && volunteers.length) {
+      volunteers.forEach(v => { if (v && v.id) updates['volunteers/' + v.id] = v; });
+    }
+    if (emergencyRequests && emergencyRequests.length) {
+      emergencyRequests.forEach(r => { if (r && r.id) updates['requests/' + r.id] = r; });
+    }
+    if (notices && notices.length) {
+      notices.forEach(n => { if (n && n.id) updates['notices/' + n.id] = n; });
+    }
+    if (activities && activities.length) {
+      activities.forEach(a => { if (a && a.id) updates['activities/' + a.id] = a; });
+    }
+    if (siteSettings) {
+      updates['settings/site'] = siteSettings;
+    }
+
+    await realtimeDb.ref().update(updates);
+
+    Swal.fire({
+      icon: 'success',
+      title: 'স্থানান্তর সফল হয়েছে!',
+      text: 'লোকালস্টোরেজের সকল রক্তদাতা, রক্তের অনুরোধ ও স্বেচ্ছাসেবী তথ্য ফায়ারবেসে সফলভাবে স্থানান্তরিত হয়েছে।',
+      confirmButtonColor: '#1b8040'
+    });
+  } catch(e) {
+    console.error('Migration failed:', e);
+    Swal.fire({
+      icon: 'error',
+      title: 'স্থানান্তর ব্যর্থ হয়েছে',
+      text: e.message || 'ফায়ারবেস ডেটাবেজ পারমিশন পরীক্ষা করুন।',
+      confirmButtonColor: '#e11d48'
+    });
+  }
+}
+
+function renderAdminCloudPanel() {
+  updateCloudMetricsUI();
+}
+
+function toggleAnonKeyVisibility() {}
+
+async function saveAndTestSupabaseConfig() {
+  if (isFirebaseReady()) {
+    Swal.fire({
+      icon: 'success',
+      title: 'ফায়ারবেস সক্রিয়',
+      text: 'Firebase Realtime Database সফলভাবে সংযুক্ত রয়েছে।',
+      confirmButtonColor: '#1b8040'
+    });
+  } else {
+    initFirebaseClient();
+    Swal.fire({
+      icon: isFirebaseReady() ? 'success' : 'info',
+      title: isFirebaseReady() ? 'ফায়ারবেস সংযুক্ত!' : 'অফলাইন মোড',
+      text: isFirebaseReady() ? 'রিয়েলটাইম ডেটাবেজ এখন চালু।' : 'বর্তমানে লোকাল মোডে চলছে।',
+      confirmButtonColor: '#1b8040'
+    });
+  }
+}
+
+// Stubs for compatibility
 async function cloudUpsertAid() {}
 async function cloudBulkUpsertAid() {}
 async function cloudDeleteAid() {}
 async function cloudUpsertRecord() {}
-async function cloudSaveSettings() {}
 async function syncAllFromSupabase() {}
-async function syncAllFromFirebase() {}
-function setupFirebaseRealtime() {}
+async function syncAllFromFirebase() { setupFirebaseRealtime(); }
 function setupSupabaseRealtime() {}
-function initFirebaseClient() { updateCloudStatusBadge(false, 'লোকাল মোড'); }
-function renderAdminCloudPanel() { updateCloudMetricsUI(); }
-function toggleAnonKeyVisibility() {}
-async function saveAndTestSupabaseConfig() {
-  if (typeof Swal !== 'undefined') {
-    Swal.fire({ icon: 'info', title: 'লোকাল মোড', text: 'এই ওয়েবসাইটটি বর্তমানে লোকাল মোডে চলছে। ক্লাউড সংযোগ নেই।', confirmButtonColor: '#e11d48' });
-  }
-}
-async function migrateAllDataToCloud() {
-  if (typeof Swal !== 'undefined') {
-    Swal.fire({ icon: 'info', title: 'লোকাল মোড', text: 'ক্লাউড সংযোগ নেই।', confirmButtonColor: '#e11d48' });
-  }
-}
 function donorToRow(d) { return d; }
 function rowToDonor(r) { return r; }
 function volunteerToRow(v) { return v; }
