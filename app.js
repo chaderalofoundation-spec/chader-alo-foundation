@@ -372,16 +372,6 @@ let activityUploadedPhoto = null;
 let editingActivityId = null;
 let aidApplications = [];
 
-// Supabase Cloud State
-var supabaseClient = null;
-var realtimeChannel = null;
-var isSyncingFromCloud = false;
-var SUPABASE_CONFIG = {
-  url: "https://evnqybxfdzrvormdyutu.supabase.co",
-  anonKey: "",  // << অ্যাডমিন প্যানেল > ক্লাউড ডেটাবেজ থেকে Publishable Key সেট করুন
-  enabled: true
-};
-
 // Safe Swal fallback if offline or CDN blocked
 if (typeof Swal === 'undefined') {
   window.Swal = {
@@ -503,9 +493,6 @@ function initApp() {
   updateNoticeStats();
   renderAdminNoticeList();
   applyAdminUIState();
-  initSupabaseClient();
-  syncAllFromSupabase();
-  setupSupabaseRealtime();
 }
 
 if (document.readyState === 'loading') {
@@ -734,18 +721,15 @@ function loadData() {
 function saveDonors() {
   localStorage.setItem(STORAGE_KEYS.DONORS, JSON.stringify(donors));
   updateHomeStats();
-  if (isSupabaseReady()) cloudBulkUpsertDonors(donors);
 }
 
 function saveVolunteers() {
   localStorage.setItem(STORAGE_KEYS.VOLUNTEERS, JSON.stringify(volunteers));
   updateHomeStats();
-  if (isSupabaseReady()) cloudBulkUpsertVolunteers(volunteers);
 }
 
 function saveSettings() {
   localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(siteSettings));
-  if (isSupabaseReady()) cloudSaveSettings(siteSettings);
 }
 
 // -------------------------------------------------------------
@@ -1541,7 +1525,6 @@ function handleEmergencySubmit(e) {
   };
   emergencyRequests.unshift(newReq);
   localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(emergencyRequests));
-  if (typeof isSupabaseReady === 'function' && isSupabaseReady()) cloudUpsertRequest(newReq);
 
   document.getElementById('emergency-request-form').reset();
   renderEmergencyRequests();
@@ -1630,23 +1613,8 @@ function updateUrgentBanner() {
 // ADMIN DASHBOARD ENGINE
 // -------------------------------------------------------------
 async function checkAdminSession() {
-  // First try Supabase Auth session (most secure)
-  if (isSupabaseReady()) {
-    try {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (session && session.user) {
-        isAdminLoggedIn = true;
-        sessionStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, 'true');
-        const gate = document.getElementById('admin-login-gate');
-        const dash = document.getElementById('admin-dashboard-view');
-        if (gate) gate.classList.add('hidden');
-        if (dash) dash.classList.remove('hidden');
-        updateAdminDashboard();
-        return;
-      }
-    } catch(e) { console.warn('Supabase session check failed:', e); }
-  }
-  // Fallback: sessionStorage PIN session
+  // First check Firebase Auth state
+    // Fallback: sessionStorage PIN session
   if (sessionStorage.getItem(STORAGE_KEYS.ADMIN_AUTH) === 'true') {
     isAdminLoggedIn = true;
     const gate = document.getElementById('admin-login-gate');
@@ -1721,7 +1689,7 @@ function handleAdminTabClick() {
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
             ২৫৬-বিট সুরক্ষিত নিয়ন্ত্রণ ব্যবস্থা
           </div>
-          <p class="text-xs text-slate-300 font-bold mb-3">Supabase Auth দিয়ে লগইন: ইমেইল + পাসওয়ার্ড দিন। অথবা শুধু নিচে অফলাইন PIN দিন:</p>
+          <p class="text-xs text-slate-300 font-bold mb-3">নিচে অ্যাডমিন পিন কোড দিন:</p>
           <div class="relative max-w-xs mx-auto mb-2">
             <input type="email" id="swal-admin-email" 
                    class="w-full text-center text-sm bg-slate-800 text-slate-100 border border-slate-600 rounded-lg py-2 px-3 focus:outline-none focus:border-emerald-400 placeholder-slate-500" 
@@ -1768,25 +1736,8 @@ function handleAdminTabClick() {
           Swal.showValidationMessage('অনুগ্রহ করে পিন কোড প্রদান করুন');
           return false;
         }
-        // If Supabase is ready, try email+PIN as password login
-        if (isSupabaseReady()) {
-          const emailEl = document.getElementById('swal-admin-email');
-          const email = emailEl ? emailEl.value.trim() : '';
-          if (email) {
-            try {
-              const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pin });
-              if (error) {
-                Swal.showValidationMessage('ইমেইল বা পাসওয়ার্ড ভুল! পুনরায় চেষ্টা করুন।');
-                return false;
-              }
-              return true; // Supabase auth success
-            } catch(e) {
-              Swal.showValidationMessage('সংযোগ সমস্যা। পুনরায় চেষ্টা করুন।');
-              return false;
-            }
-          }
-        }
-        // Fallback: local PIN check
+        // If Firebase Auth is available and email provided:
+                // Fallback: local PIN check
         if (pin !== adminPin) {
           Swal.showValidationMessage('ভুল পিন কোড! সঠিক পিন দিন।');
           return false;
@@ -1819,11 +1770,8 @@ function handleAdminTabClick() {
 async function adminLogout() {
   isAdminLoggedIn = false;
   sessionStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
-  // Sign out from Supabase Auth if connected
-  if (isSupabaseReady()) {
-    try { await supabaseClient.auth.signOut(); } catch(e) { console.warn('Supabase signOut error:', e); }
-  }
-  applyAdminUIState();
+  // Sign out from Firebase Auth if connected
+    applyAdminUIState();
   const gate = document.getElementById('admin-login-gate');
   const dash = document.getElementById('admin-dashboard-view');
   if (gate) gate.classList.remove('hidden');
@@ -1954,7 +1902,6 @@ function adminMarkDonatedToday(id) {
 function adminDeleteDonor(id) {
   donors = donors.filter(x => x.id !== id);
   saveDonors();
-  if (typeof isSupabaseReady === 'function' && isSupabaseReady()) cloudDeleteDonor(id);
   updateAdminDashboard();
   filterDonors();
   Swal.fire('মুছে ফেলা হয়েছে', 'ডোনার তালিকা থেকে বাদ দেওয়া হয়েছে', 'success');
@@ -2250,12 +2197,10 @@ function toBengaliNumeral(n) {
 function saveActivities() {
   localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
   updateHomeStats();
-  if (isSupabaseReady()) cloudBulkUpsertActivities(activities);
 }
 
 function saveAidApplications() {
   localStorage.setItem(STORAGE_KEYS.AID, JSON.stringify(aidApplications));
-  if (isSupabaseReady()) cloudBulkUpsertAid(aidApplications);
 }
 
 // ============================================================
@@ -2393,11 +2338,19 @@ function openAddActivityModal() {
   if (placeholder) placeholder.classList.remove('hidden');
   // show photo, hide video
   toggleMediaTypeFields();
-  document.getElementById('activity-modal').classList.remove('hidden');
+  const modal = document.getElementById('activity-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
 }
 
 function closeActivityModal() {
-  document.getElementById('activity-modal').classList.add('hidden');
+  const modal = document.getElementById('activity-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
   activityUploadedPhoto = null;
   editingActivityId = null;
 }
@@ -2534,7 +2487,6 @@ function adminDeleteActivity(actId) {
     if (res.isConfirmed) {
       activities = activities.filter(a => a.id !== actId);
       saveActivities();
-      if (typeof isSupabaseReady === 'function' && isSupabaseReady()) cloudDeleteActivity(actId);
       renderGallery('ALL');
       renderAdminGalleryGrid();
       Swal.fire({ icon: 'success', title: 'মুছে ফেলা হয়েছে!', timer: 1200, showConfirmButton: false });
@@ -2585,12 +2537,20 @@ function switchAdminModule(modId) {
   modules.forEach(m => {
     const box = document.getElementById('adm-box-' + m);
     const tab = document.getElementById('adm-mod-' + m);
-    if (box) box.classList.add('hidden');
+    if (box) {
+      box.classList.add('hidden');
+      box.classList.remove('block');
+      box.style.display = 'none';
+    }
     if (tab) tab.classList.remove('active');
   });
   const activeBox = document.getElementById('adm-box-' + modId);
   const activeTab = document.getElementById('adm-mod-' + modId);
-  if (activeBox) activeBox.classList.remove('hidden');
+  if (activeBox) {
+    activeBox.classList.remove('hidden');
+    activeBox.classList.add('block');
+    activeBox.style.display = 'block';
+  }
   if (activeTab) activeTab.classList.add('active');
 
   if (modId === 'gallery') renderAdminGalleryGrid();
@@ -2682,7 +2642,6 @@ function adminDeleteRequest(reqId) {
     if (res.isConfirmed) {
       emergencyRequests = emergencyRequests.filter(r => r.id !== reqId);
       localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(emergencyRequests));
-      if (typeof isSupabaseReady === 'function' && isSupabaseReady()) cloudDeleteRequest(reqId);
       renderAdminEmergencyList();
       renderEmergencyRequests();
       updateUrgentBanner();
@@ -3135,7 +3094,6 @@ function adminDeleteVolunteer(volId) {
     if (res.isConfirmed) {
       volunteers = volunteers.filter(x => x.id !== volId);
       saveVolunteers();
-      if (typeof isSupabaseReady === 'function' && isSupabaseReady()) cloudDeleteVolunteer(volId);
       renderAdminVolunteersTable();
       updateAdminDashboard();
       Swal.fire({ icon: 'success', title: 'মুছে ফেলা হয়েছে!', timer: 1200, showConfirmButton: false });
@@ -3569,10 +3527,6 @@ function handleBloodManagedSubmit(e) {
   donationRecords.unshift(record);
   saveDonationRecords();
   localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(emergencyRequests));
-  if (typeof isSupabaseReady === 'function' && isSupabaseReady()) {
-    cloudUpsertRequest(req);
-    cloudUpsertRecord(record);
-  }
 
   // 3. If donor is registered in donors list, update last donation date & count
   const regDonor = donors.find(d => d.phone === donorPhone || (donorName && d.name.toLowerCase() === donorName.toLowerCase()));
@@ -3715,9 +3669,6 @@ async function saveNotices() {
   renderHomeNotices();
   renderAdminNoticeList();
   updateNoticeStats();
-  if (isSupabaseReady()) {
-    try { await cloudBulkUpsertNotices(notices); } catch(e) { console.error('Notice cloud sync failed:', e); }
-  }
 }
 
 function updateNoticeStats() {
@@ -3931,12 +3882,18 @@ function openNoticeViewModal(id) {
   if (contentEl) contentEl.textContent = n.content || n.summary || '';
 
   const modal = document.getElementById('notice-view-modal');
-  if (modal) modal.classList.remove('hidden');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
 }
 
 function closeNoticeViewModal() {
   const modal = document.getElementById('notice-view-modal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
 }
 
 function printOfficialNotice() {
@@ -3978,12 +3935,18 @@ function openNoticeEditModal(id = null) {
     if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
   }
 
-  if (modal) modal.classList.remove('hidden');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
 }
 
 function closeNoticeEditModal() {
   const modal = document.getElementById('notice-edit-modal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
 }
 
 async function handleNoticeSubmit(e) {
@@ -4033,41 +3996,12 @@ async function handleNoticeSubmit(e) {
   updateNoticeStats();
 
   closeNoticeEditModal();
-
-  // ক্লাউডে সংরক্ষণের চেষ্টা
-  if (isSupabaseReady() && targetNotice) {
-    const result = await cloudUpsertNotice(targetNotice);
-    if (result && result.success) {
-      Swal.fire({
-        icon: 'success',
-        title: editId ? 'নোটিশ সফলভাবে সংরক্ষিত হয়েছে!' : 'নতুন নোটিশ সফলভাবে প্রকাশিত হয়েছে!',
-        text: 'সব ডিভাইস ও ব্রাউজারে দেখা যাবে।',
-        confirmButtonColor: '#e11d48'
-      });
-    } else if (result && result.offline) {
-      Swal.fire({
-        icon: 'info',
-        title: editId ? 'নোটিশ স্থানীয়ভাবে সংরক্ষিত' : 'নোটিশ স্থানীয়ভাবে প্রকাশিত',
-        text: 'Supabase সংযোগ পাওয়া যাচ্ছে না। শুধু এই ডিভাইসে দেখা যাবে। অ্যাডমিন প্যানেলে Supabase Key সেট করুন।',
-        confirmButtonColor: '#e11d48'
-      });
-    } else {
-      Swal.fire({
-        icon: 'warning',
-        title: 'ক্লাউডে সংরক্ষণ ব্যর্থ!',
-        text: 'নোটিশ এই ডিভাইসে সংরক্ষিত হয়েছে, কিন্তু অন্য ডিভাইসে দেখা যাবে না। ইন্টারনেট সংযোগ ও Supabase সেটিং পরীক্ষা করুন।',
-        confirmButtonColor: '#e11d48'
-      });
-    }
-  } else {
-    // Supabase নেই — শুধু স্থানীয়
-    Swal.fire({
-      icon: 'success',
-      title: editId ? 'নোটিশ সংরক্ষিত হয়েছে!' : 'নোটিশ প্রকাশিত হয়েছে!',
-      text: 'Supabase সংযোগ নেই — শুধু এই ডিভাইসে দেখা যাবে।',
-      confirmButtonColor: '#e11d48'
-    });
-  }
+  // সফলভাবে সংরক্ষিত
+  Swal.fire({
+    icon: 'success',
+    title: editId ? 'নোটিশ সফলভাবে সংরক্ষিত হয়েছে!' : 'নতুন নোটিশ সফলভাবে প্রকাশিত হয়েছে!',
+    confirmButtonColor: '#e11d48'
+  });
 }
 
 function adminDeleteNotice(id) {
@@ -4083,7 +4017,6 @@ function adminDeleteNotice(id) {
     if (res.isConfirmed) {
       notices = notices.filter(n => n.id !== id);
       saveNotices();
-      if (typeof isSupabaseReady === 'function' && isSupabaseReady()) cloudDeleteNotice(id);
       Swal.fire({ icon: 'success', title: 'নোটিশ মুছে ফেলা হয়েছে!', timer: 1200, showConfirmButton: false });
     }
   });
@@ -4163,911 +4096,61 @@ function renderAdminNoticeList() {
 
 
 // ==============================================================================
-// SUPABASE CLOUD DATABASE & REALTIME SYNCHRONIZATION ENGINE
-// ==============================================================================
 
-const STORAGE_KEYS_CLOUD = {
-  SUPABASE_CONFIG: "caf_supabase_config_v4"
-};
-
-// Ensure Supabase state variables
-if (!SUPABASE_CONFIG) {
-  SUPABASE_CONFIG = {
-    url: "https://evnqybxfdzrvormdyutu.supabase.co",
-    anonKey: "",
-    enabled: true
-  };
-} else {
-  if (!SUPABASE_CONFIG.url) SUPABASE_CONFIG.url = "https://evnqybxfdzrvormdyutu.supabase.co";
-  if (!SUPABASE_CONFIG.anonKey) SUPABASE_CONFIG.anonKey = "";
-  SUPABASE_CONFIG.enabled = true;
-}
-
-// Embedded SQL Schema for Admin Modal view/copy
-const EMBEDDED_SUPABASE_SCHEMA_SQL = "-- ==============================================================================\n-- চাঁদের আলো ফাউন্ডেশন (Chader Alo Foundation)\n-- Supabase PostgreSQL Cloud Database Schema & Row Level Security (RLS) Setup\n-- ==============================================================================\n\n-- 1. Enable UUID Extension (if needed)\nCREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\n\n-- ------------------------------------------------------------------------------\n-- 2. CREATE TABLES\n-- ------------------------------------------------------------------------------\n\n-- Table: Blood Donors (রক্তদাতা তালিকা)\nCREATE TABLE IF NOT EXISTS public.donors (\n    id TEXT PRIMARY KEY,\n    name TEXT NOT NULL,\n    father TEXT DEFAULT '',\n    blood_group TEXT NOT NULL,\n    dob TEXT DEFAULT '',\n    gender TEXT DEFAULT 'পুরুষ',\n    weight NUMERIC DEFAULT 0,\n    phone TEXT NOT NULL,\n    whatsapp TEXT DEFAULT '',\n    upazila TEXT DEFAULT 'গজারিয়া',\n    village TEXT DEFAULT '',\n    has_donated TEXT DEFAULT 'হ্যাঁ',\n    last_donation_date TEXT DEFAULT '',\n    donation_count INTEGER DEFAULT 0,\n    verified BOOLEAN DEFAULT TRUE,\n    status TEXT DEFAULT 'active',\n    photo TEXT DEFAULT '',\n    is_demo BOOLEAN DEFAULT FALSE,\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Volunteers (স্বেচ্ছাসেবী কর্নার)\nCREATE TABLE IF NOT EXISTS public.volunteers (\n    id TEXT PRIMARY KEY,\n    name TEXT NOT NULL,\n    father TEXT DEFAULT '',\n    blood_group TEXT DEFAULT '',\n    dob TEXT DEFAULT '',\n    profession TEXT DEFAULT '',\n    phone TEXT NOT NULL,\n    whatsapp TEXT DEFAULT '',\n    upazila TEXT DEFAULT 'গজারিয়া',\n    village TEXT DEFAULT '',\n    interest TEXT DEFAULT '',\n    photo TEXT DEFAULT '',\n    status TEXT DEFAULT 'active',\n    joined_date TEXT DEFAULT '',\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Emergency Blood Requests (জরুরি রক্তের আবেদন)\nCREATE TABLE IF NOT EXISTS public.emergency_requests (\n    id TEXT PRIMARY KEY,\n    patient_name TEXT NOT NULL,\n    blood_group TEXT NOT NULL,\n    bags TEXT DEFAULT '1',\n    time TEXT DEFAULT 'জরুরি',\n    hospital TEXT DEFAULT '',\n    contact TEXT DEFAULT '',\n    phone TEXT NOT NULL,\n    reason TEXT DEFAULT '',\n    urgency TEXT DEFAULT 'জরুরি',\n    status TEXT DEFAULT 'active', -- active, managed, cancelled\n    managed_date TEXT DEFAULT '',\n    donor_name TEXT DEFAULT '',\n    donor_phone TEXT DEFAULT '',\n    notes TEXT DEFAULT '',\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Notice Board (নোটিশ ও সার্কুলার)\nCREATE TABLE IF NOT EXISTS public.notices (\n    id TEXT PRIMARY KEY,\n    title TEXT NOT NULL,\n    category TEXT NOT NULL,\n    date TEXT DEFAULT '',\n    priority TEXT DEFAULT 'normal', -- normal, urgent, pinned\n    author TEXT DEFAULT 'পরিচালনা পরিষদ',\n    signee_role TEXT DEFAULT 'সভাপতি',\n    status TEXT DEFAULT 'active',\n    summary TEXT DEFAULT '',\n    content TEXT NOT NULL,\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Activities & Gallery (গ্যালারি ও সামাজিক কর্মকাণ্ড)\nCREATE TABLE IF NOT EXISTS public.activities (\n    id TEXT PRIMARY KEY,\n    title TEXT NOT NULL,\n    category TEXT NOT NULL,\n    media_type TEXT DEFAULT 'image', -- image, video\n    media_url TEXT DEFAULT '',\n    date TEXT DEFAULT '',\n    location TEXT DEFAULT '',\n    description TEXT DEFAULT '',\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Aid & Service Applications (মানবকল্যাণ ও সেবামূলক আবেদন)\nCREATE TABLE IF NOT EXISTS public.aid_applications (\n    id TEXT PRIMARY KEY,\n    service_name TEXT NOT NULL,\n    name TEXT NOT NULL,\n    phone TEXT NOT NULL,\n    address TEXT DEFAULT '',\n    details TEXT DEFAULT '',\n    status TEXT DEFAULT 'pending', -- pending, approved, rejected\n    submitted_at TEXT DEFAULT '',\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Donation Records (রক্তদান সম্পন্ন ইতিহাস)\nCREATE TABLE IF NOT EXISTS public.donation_records (\n    id TEXT PRIMARY KEY,\n    request_id TEXT DEFAULT '',\n    patient_name TEXT DEFAULT '',\n    patient_phone TEXT DEFAULT '',\n    hospital TEXT DEFAULT '',\n    blood_group TEXT DEFAULT '',\n    bags TEXT DEFAULT '1',\n    donor_name TEXT DEFAULT '',\n    donor_phone TEXT DEFAULT '',\n    donor_address TEXT DEFAULT '',\n    donation_date TEXT DEFAULT '',\n    managed_date TEXT DEFAULT '',\n    notes TEXT DEFAULT '',\n    status TEXT DEFAULT 'managed',\n    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Site Settings (ওয়েবসাইট কনফিগারেশন)\nCREATE TABLE IF NOT EXISTS public.site_settings (\n    key TEXT PRIMARY KEY,\n    value JSONB NOT NULL,\n    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Table: Global Visitor Counter (ভিজিটর কাউন্টার)\nCREATE TABLE IF NOT EXISTS public.visitor_counter (\n    id TEXT PRIMARY KEY DEFAULT 'main',\n    count BIGINT DEFAULT 1,\n    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- ------------------------------------------------------------------------------\n-- 3. ROW LEVEL SECURITY (RLS) POLICIES\n-- ------------------------------------------------------------------------------\n\n-- Enable RLS on all tables\nALTER TABLE public.donors ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.volunteers ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.emergency_requests ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.notices ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.activities ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.aid_applications ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.donation_records ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;\nALTER TABLE public.visitor_counter ENABLE ROW LEVEL SECURITY;\n\n-- Clean existing policies (idempotent setup)\nDO $$\nBEGIN\n    DROP POLICY IF EXISTS \"Public can view donors\" ON public.donors;\n    DROP POLICY IF EXISTS \"Public can register as donor\" ON public.donors;\n    DROP POLICY IF EXISTS \"Admins can update donors\" ON public.donors;\n    DROP POLICY IF EXISTS \"Admins can delete donors\" ON public.donors;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.donors;\n\n    DROP POLICY IF EXISTS \"Public can view volunteers\" ON public.volunteers;\n    DROP POLICY IF EXISTS \"Public can register as volunteer\" ON public.volunteers;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.volunteers;\n\n    DROP POLICY IF EXISTS \"Public can view emergency_requests\" ON public.emergency_requests;\n    DROP POLICY IF EXISTS \"Public can create emergency request\" ON public.emergency_requests;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.emergency_requests;\n\n    DROP POLICY IF EXISTS \"Public can view notices\" ON public.notices;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.notices;\n\n    DROP POLICY IF EXISTS \"Public can view activities\" ON public.activities;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.activities;\n\n    DROP POLICY IF EXISTS \"Public can submit aid application\" ON public.aid_applications;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.aid_applications;\n\n    DROP POLICY IF EXISTS \"Public can view donation_records\" ON public.donation_records;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.donation_records;\n\n    DROP POLICY IF EXISTS \"Public can view site_settings\" ON public.site_settings;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.site_settings;\n\n    DROP POLICY IF EXISTS \"Public can view visitor_counter\" ON public.visitor_counter;\n    DROP POLICY IF EXISTS \"Full access to authenticated\" ON public.visitor_counter;\nEND $$;\n\n-- A. PUBLIC READ POLICIES (সবার জন্য উন্মুক্ত প্রদর্শন)\nCREATE POLICY \"Public can view donors\" ON public.donors FOR SELECT USING (true);\nCREATE POLICY \"Public can view volunteers\" ON public.volunteers FOR SELECT USING (true);\nCREATE POLICY \"Public can view emergency_requests\" ON public.emergency_requests FOR SELECT USING (true);\nCREATE POLICY \"Public can view notices\" ON public.notices FOR SELECT USING (true);\nCREATE POLICY \"Public can view activities\" ON public.activities FOR SELECT USING (true);\nCREATE POLICY \"Public can view donation_records\" ON public.donation_records FOR SELECT USING (true);\nCREATE POLICY \"Public can view site_settings\" ON public.site_settings FOR SELECT USING (true);\nCREATE POLICY \"Public can view visitor_counter\" ON public.visitor_counter FOR SELECT USING (true);\n\n-- B. PUBLIC INSERT POLICIES (ওয়েবসাইটে ভিজিটররা সরাসরি যেসব আবেদন করতে পারবেন)\nCREATE POLICY \"Public can register as donor\" ON public.donors FOR INSERT WITH CHECK (true);\nCREATE POLICY \"Public can register as volunteer\" ON public.volunteers FOR INSERT WITH CHECK (true);\nCREATE POLICY \"Public can create emergency request\" ON public.emergency_requests FOR INSERT WITH CHECK (true);\nCREATE POLICY \"Public can submit aid application\" ON public.aid_applications FOR INSERT WITH CHECK (true);\n\n-- C. ADMIN POLICIES (লগইন করা অ্যাডমিনদের জন্য সম্পূর্ণ নিয়ন্ত্রণ)\n-- When Admin signs in with Supabase Auth (authenticated role):\nCREATE POLICY \"Full access to authenticated on donors\" ON public.donors FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on volunteers\" ON public.volunteers FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on emergency_requests\" ON public.emergency_requests FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on notices\" ON public.notices FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on activities\" ON public.activities FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on aid_applications\" ON public.aid_applications FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on donation_records\" ON public.donation_records FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on site_settings\" ON public.site_settings FOR ALL TO authenticated USING (true) WITH CHECK (true);\nCREATE POLICY \"Full access to authenticated on visitor_counter\" ON public.visitor_counter FOR ALL TO authenticated USING (true) WITH CHECK (true);\n\n-- D. ANON PERMISSIVE POLICIES FOR DIRECT PIN ADMIN ACCESS\n-- Note: Allows frontend CRUD operations using Anon Key while maintaining client-side Admin PIN verification.\nCREATE POLICY \"Allow anon update and delete on donors\" ON public.donors FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update and delete on volunteers\" ON public.volunteers FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update and delete on emergency_requests\" ON public.emergency_requests FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update and delete on notices\" ON public.notices FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update and delete on activities\" ON public.activities FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon select and update on aid_applications\" ON public.aid_applications FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update and delete on donation_records\" ON public.donation_records FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update on site_settings\" ON public.site_settings FOR ALL TO anon USING (true) WITH CHECK (true);\nCREATE POLICY \"Allow anon update on visitor_counter\" ON public.visitor_counter FOR ALL TO anon USING (true) WITH CHECK (true);\n\n-- ------------------------------------------------------------------------------\n-- 4. REALTIME REPLICATION (এক ডিভাইসের পরিবর্তন অন্য ডিভাইসে স্বয়ংক্রিয় রিয়েলটাইম আপডেট)\n-- ------------------------------------------------------------------------------\nALTER PUBLICATION supabase_realtime ADD TABLE public.donors;\nALTER PUBLICATION supabase_realtime ADD TABLE public.volunteers;\nALTER PUBLICATION supabase_realtime ADD TABLE public.emergency_requests;\nALTER PUBLICATION supabase_realtime ADD TABLE public.notices;\nALTER PUBLICATION supabase_realtime ADD TABLE public.activities;\nALTER PUBLICATION supabase_realtime ADD TABLE public.aid_applications;\nALTER PUBLICATION supabase_realtime ADD TABLE public.donation_records;\nALTER PUBLICATION supabase_realtime ADD TABLE public.site_settings;\nALTER PUBLICATION supabase_realtime ADD TABLE public.visitor_counter;\n\n-- ------------------------------------------------------------------------------\n-- 5. ATOMIC VISITOR INCREMENT FUNCTION (নিরাপদ ভিজিটর কাউন্টার)\n-- ------------------------------------------------------------------------------\nCREATE OR REPLACE FUNCTION public.increment_visitor_count()\nRETURNS BIGINT AS $$\nDECLARE\n  new_count BIGINT;\nBEGIN\n  INSERT INTO public.visitor_counter (id, count)\n  VALUES ('main', 1)\n  ON CONFLICT (id)\n  DO UPDATE SET count = public.visitor_counter.count + 1, updated_at = NOW()\n  RETURNING count INTO new_count;\n  RETURN new_count;\nEND;\n$$ LANGUAGE plpgsql SECURITY DEFINER;\n\n-- ------------------------------------------------------------------------------\n-- 6. SEED INITIAL DATA (প্রাথমিক ডিফল্ট ডেটা যা কখনোই হারাবে না)\n-- ------------------------------------------------------------------------------\n\n-- Seed Donors (হালিম দেওয়ান ও মোঃ মাসুম শিকদার)\nINSERT INTO public.donors (id, name, father, blood_group, dob, gender, weight, phone, whatsapp, upazila, village, has_donated, last_donation_date, donation_count, verified, status, photo, is_demo)\nVALUES \n(\n  'CAF-BD-1001',\n  'হালিম দেওয়ান',\n  '',\n  'B+',\n  '1980-01-01',\n  'পুরুষ',\n  70,\n  '01914927933',\n  '01914927933',\n  'গজারিয়া',\n  'কলেজ রোড',\n  'হ্যাঁ',\n  '2026-03-25',\n  5,\n  true,\n  'active',\n  'assets/leader_halim.jpg',\n  false\n),\n(\n  'CAF-BD-1002',\n  'মোঃ মাসুম শিকদার',\n  '',\n  'A+',\n  '1985-05-10',\n  'পুরুষ',\n  68,\n  '01785677062',\n  '01785677062',\n  'গজারিয়া',\n  'হোগলাকান্দি, ভবেরচর, কলেজ রোড',\n  'হ্যাঁ',\n  '2026-08-02',\n  21,\n  true,\n  'active',\n  'assets/leader_masum.png',\n  false\n)\nON CONFLICT (id) DO NOTHING;\n\n-- Seed Notices (৩টি অফিসিয়াল ডিফল্ট নোটিশ)\nINSERT INTO public.notices (id, title, category, date, priority, author, signee_role, status, summary, content)\nVALUES\n(\n  'NOT-2026-001',\n  'বিনামূল্যে রক্তের গ্রুপ নির্ণয় ও স্বেচ্ছায় রক্তদান ক্যাম্পেইন-২০২৬',\n  'রক্তদান কর্মসূচি',\n  '2026-10-25',\n  'pinned',\n  'হালিম দেওয়ান (সভাপতি)',\n  'সভাপতি',\n  'active',\n  'আগামী শুক্রবার ভবেরচর কলেজ রোড প্রাঙ্গণে দিনব্যাপী বিনামূল্যে রক্তের গ্রুপ নির্ণয় ও রক্তদান ক্যাম্পেইন অনুষ্ঠিত হবে।',\n  'চাঁদের আলো ফাউন্ডেশনের সকল শুভাকাঙ্ক্ষী ও এলাকাবাসীর সদয় অবগতির জন্য জানানো যাচ্ছে যে, আর্ত মানবতার সেবায় নিয়মিত কর্মসূচির অংশ হিসেবে আগামী শুক্রবার সকাল ৯:০০ টা থেকে বিকেল ৫:০০ টা পর্যন্ত ভবেরচর কলেজ রোডস্থ অস্থায়ী কার্যালয়ে এক বিশাল ''বিনামূল্যে রক্তের গ্রুপ নির্ণয় ও স্বেচ্ছায় রক্তদান কর্মসূচি-২০২৬'' অনুষ্ঠিত হবে।\\n\\nউক্ত ক্যাম্পেইনে উপস্থিত থাকবেন গজারিয়া উপজেলার বিশিষ্ট সমাজসেবক, চিকিৎসকবৃন্দ ও ফাউন্ডেশনের কার্যনির্বাহী পরিষদের নেতৃবৃন্দ। ১৮ থেকে ৬০ বছর বয়সী সকল সুস্থ ব্যক্তিকে এই মহৎ রক্তদান কর্মসূচিতে অংশগ্রহণ করে মুমূর্ষু রোগীর পাশে দাঁড়ানোর উদাত্ত আহ্বান জানানো হচ্ছে।'\n),\n(\n  'NOT-2026-002',\n  'শীতার্ত ও সুবিধাবঞ্চিত মানুষের মাঝে শীতবস্ত্র বিতরণ সংক্রান্ত জরুরি বিজ্ঞপ্তি',\n  'সমাজকল্যাণ',\n  '2026-10-20',\n  'urgent',\n  'মোঃ মাসুম শিকদার (সাধারণ সম্পাদক)',\n  'সাধারণ সম্পাদক',\n  'active',\n  'আসন্ন শীত মৌসুমে অসহায় ও দরিদ্র পরিবারের মাঝে কম্বল ও শীতবস্ত্র বিতরণের তালিকা প্রস্তুত কার্যক্রম শুরু হয়েছে।',\n  'চাঁদের আলো ফাউন্ডেশনের উদ্যোগে আগামী মাসে গজারিয়া উপজেলার বিভিন্ন ইউনিয়নের প্রত্যন্ত অঞ্চলে অসহায় বিধবা, এতিম ও দরিদ্র পরিবারের মাঝে শীতবস্ত্র ও কম্বল বিতরণ কর্মসূচি পরিচালিত হবে।\\n\\nফাউন্ডেশনের সকল ইউনিয়ন ও ওয়ার্ড পর্যায়ের স্বেচ্ছাসেবীদের আগামী ৫ নভেম্বরের মধ্যে নিজ নিজ এলাকার প্রকৃত অসচ্ছল পরিবারের তালিকা প্রস্তুত করে সাধারণ সম্পাদকের নিকট জমা দেওয়ার জন্য নির্দেশ প্রদান করা হলো। যেকোনো তথ্যের জন্য সরাসরি হেল্পলাইনে (০১৯১৪-৯২৭৯৩৩) যোগাযোগ করার অনুরোধ করা হলো।'\n),\n(\n  'NOT-2026-003',\n  'ফাউন্ডেশনের আজীবন ও সাধারণ সদস্যপদ গ্রহণ নীতিমালা ও ফরম বিতরণ',\n  'সাধারণ নোটিশ',\n  '2026-10-10',\n  'normal',\n  'কার্যনির্বাহী পরিষদ (যৌথ)',\n  'সাধারণ সম্পাদক',\n  'active',\n  'চাঁদের আলো ফাউন্ডেশনের গঠনতন্ত্রের ধারা-০৫ মোতাবেক নতুন সদস্যপদ গ্রহণের আবেদন আহ্বান করা যাচ্ছে।',\n  'চাঁদের আলো ফাউন্ডেশনের গঠনতন্ত্র অনুযায়ী যারা আর্ত মানবতার সেবায় আত্মনিয়োগ করতে চান, তাদের জন্য আজীবন সদস্য ও সাধারণ সদস্যপদ গ্রহণের আবেদন উন্মুক্ত করা হয়েছে।\\n\\nআগ্রহী ব্যক্তিবর্গ ওয়েবসাইট অথবা কেন্দ্রীয় কার্যালয় (বিসমিল্লাহ ভবন, কলেজ রোড, ভবেরচর) থেকে সদস্যপদ ফরম সংগ্রহ ও পূরণ করে জমা দিতে পারবেন। আজীবন সদস্যপদের এককালীন অনুদান ১০,০০০/- টাকা এবং সাধারণ সদস্যপদের মাসিক ফি ১০০/- টাকা নির্ধারণ করা আছে।'\n)\nON CONFLICT (id) DO NOTHING;\n\n-- Seed Activities (গ্যালারির ডিফল্ট ছবি ও তথ্য)\nINSERT INTO public.activities (id, title, category, media_type, media_url, date, location, description)\nVALUES\n(\n  'ACT-01',\n  'গজারিয়ায় বিনামূল্যে রক্তের গ্রুপ নির্ণয়',\n  'রক্তদান',\n  'image',\n  'assets/activity_blood.jpg',\n  '2021-11-14',\n  'কালীপুরা এনএস কান্দি সরকারি প্রাথমিক বিদ্যালয়, ইমামপুর, গজারিয়া',\n  'মুন্সীগঞ্জের গজারিয়া উপজেলার ইমামপুর ইউনিয়নের কালীপুরা এনএস কান্দি সরকারি প্রাথমিক বিদ্যালয়ে চাঁদের আলো ফাউন্ডেশনের উদ্যোগে দিনব্যাপী বিনামূল্যে রক্তের গ্রুপ নির্ণয় ও স্বাস্থ্য সচেতনতামূলক কর্মসূচি অনুষ্ঠিত হয়। এতে চার শতাধিক মানুষের রক্তের গ্রুপ নির্ণয় করা হয়।'\n),\n(\n  'ACT-02',\n  'অসহায় ও শীতার্ত মানুষের মাঝে শীতবস্ত্র বিতরণ',\n  'ত্রাণ',\n  'image',\n  '',\n  '2022-01-10',\n  'হোগলাকান্দি, গজারিয়া',\n  'শীত মৌসুমে হতদরিদ্র পরিবারের মাঝে কম্বল ও গরম কাপড় বিতরণ কর্মসূচি।'\n),\n(\n  'ACT-03',\n  'মাসব্যাপী বৃক্ষরোপণ কর্মসূচি-২০২১',\n  'বৃক্ষরোপণ',\n  'image',\n  'assets/activity_tree.jpg',\n  '2021-07-06',\n  'গজারিয়া, মুন্সীগঞ্জ',\n  'পরিবেশের ভারসাম্য রক্ষা ও সবুজায়নের লক্ষ্যে চাঁদের আলো ফাউন্ডেশনের উদ্যোগে মাসব্যাপী বৃক্ষরোপণ কর্মসূচি-২০২১ পরিচালিত হয় এবং বিভিন্ন প্রতিষ্ঠানে ফলজ ও বনজ গাছের চারা রোপণ করা হয়।'\n)\nON CONFLICT (id) DO NOTHING;\n\n-- Initial Visitor Counter Row\nINSERT INTO public.visitor_counter (id, count)\nVALUES ('main', 1)\nON CONFLICT (id) DO NOTHING;\n";
-
-function getSupabaseConfig() {
-  // URL is hardcoded — always use it
-  SUPABASE_CONFIG.url = "https://evnqybxfdzrvormdyutu.supabase.co";
-  // Load saved key from localStorage (set via Admin Panel — works across browser sessions)
-  try {
-    const saved = localStorage.getItem(STORAGE_KEYS_CLOUD.SUPABASE_CONFIG);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed && parsed.anonKey && parsed.anonKey.length > 20) {
-        SUPABASE_CONFIG.anonKey = parsed.anonKey;
-      }
-    }
-  } catch(e) {}
-  SUPABASE_CONFIG.enabled = !!(SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey);
-  return SUPABASE_CONFIG;
-}
-
-function isSupabaseReady() {
-  const key = SUPABASE_CONFIG.anonKey || '';
-  // Valid Supabase keys: either new "sb_publishable_..." format (>20 chars) or JWT format starting with "eyJ"
-  // Reject only empty, placeholder "sb_publishable_..." (literal), or too-short keys
-  const PLACEHOLDER = 'sb_publishable_...';
-  const isEmpty = !key || key.trim() === '';
-  const isLiteral = key === PLACEHOLDER;
-  // A valid new-format key starts with "sb_publishable_" and has more than 30 chars
-  const isNewFormat = key.startsWith('sb_publishable_') && key.length > 30;
-  // A valid JWT key starts with "eyJ" and is >100 chars
-  const isJwtFormat = key.startsWith('eyJ') && key.length > 100;
-  const isValidKey = isNewFormat || isJwtFormat;
-  return supabaseClient !== null && SUPABASE_CONFIG.enabled && !!SUPABASE_CONFIG.url && !isEmpty && !isLiteral && isValidKey;
-}
-
-function initSupabaseClient() {
-  getSupabaseConfig();
-  if (!SUPABASE_CONFIG.url || !SUPABASE_CONFIG.anonKey) {
-    updateCloudStatusBadge(false, 'লোকাল মোড — অ্যাডমিন প্যানেলে Supabase Key সেট করুন');
-    return null;
-  }
-
-  if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
-    console.warn('Supabase JS library not loaded (offline or CDN blocked). Using local fallback.');
-    updateCloudStatusBadge(false, 'অফলাইন মোড (লাইব্রেরি লোড হয়নি)');
-    return null;
-  }
-
-  try {
-    supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
-      auth: { persistSession: true }
-    });
-    SUPABASE_CONFIG.enabled = true;
-    updateCloudStatusBadge(true, 'সংযুক্ত (Supabase Connected)');
-    return supabaseClient;
-  } catch(e) {
-    console.error('Failed to initialize Supabase client:', e);
-    updateCloudStatusBadge(false, 'কানেকশন ত্রুটি');
-    return null;
-  }
-}
-
-function updateCloudStatusBadge(isConnected, customText = '') {
-  const badge = document.getElementById('cloud-status-badge');
-  if (!badge) return;
-
-  if (isConnected) {
-    badge.className = 'inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-sm';
-    badge.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600"></i> <span>${customText || 'ক্লাউড সক্রিয় (সব ডিভাইসে সিঙ্ক হচ্ছে)'}</span>`;
-  } else {
-    badge.className = 'inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-sm';
-    badge.innerHTML = `<i class="fa-solid fa-circle-exclamation text-amber-600 animate-pulse"></i> <span>${customText || 'লোকাল মোড (ক্লাউড আনকানেক্টেড)'}</span>`;
-  }
-  updateCloudMetricsUI();
-}
-
-function updateCloudMetricsUI() {
-  const mDonors = document.getElementById('cloud-metric-donors');
-  const mVol = document.getElementById('cloud-metric-volunteers');
-  const mReq = document.getElementById('cloud-metric-requests');
-  const mNotices = document.getElementById('cloud-metric-notices');
-  const mActs = document.getElementById('cloud-metric-activities');
-  const mAid = document.getElementById('cloud-metric-aid');
-
-  if (mDonors) mDonors.textContent = toBengaliNumeral(donors.length);
-  if (mVol) mVol.textContent = toBengaliNumeral(volunteers.length);
-  if (mReq) mReq.textContent = toBengaliNumeral(emergencyRequests.length);
-  if (mNotices) mNotices.textContent = toBengaliNumeral(notices.length);
-  if (mActs) mActs.textContent = toBengaliNumeral(activities.length);
-  if (mAid) mAid.textContent = toBengaliNumeral(aidApplications.length);
-}
-
-// ==============================================================================
-// DATA CONVERTERS (Frontend Objects <-> PostgreSQL Rows)
-// ==============================================================================
-
-function donorToRow(d) {
-  return {
-    id: d.id,
-    name: d.name,
-    father: d.father || '',
-    blood_group: d.bloodGroup,
-    dob: d.dob || '',
-    gender: d.gender || 'পুরুষ',
-    weight: d.weight ? Number(d.weight) : 0,
-    phone: d.phone,
-    whatsapp: d.whatsapp || '',
-    upazila: d.upazila || 'গজারিয়া',
-    village: d.village || '',
-    has_donated: d.hasDonated || 'হ্যাঁ',
-    last_donation_date: d.lastDonationDate || '',
-    donation_count: d.donationCount ? Number(d.donationCount) : 0,
-    verified: Boolean(d.verified),
-    status: d.status || 'active',
-    photo: d.photo || '',
-    is_demo: Boolean(d.isDemo)
-  };
-}
-
-function rowToDonor(r) {
-  return {
-    id: r.id,
-    name: r.name,
-    father: r.father || '',
-    bloodGroup: r.blood_group,
-    dob: r.dob || '',
-    gender: r.gender || 'পুরুষ',
-    weight: r.weight || 0,
-    phone: r.phone,
-    whatsapp: r.whatsapp || '',
-    upazila: r.upazila || 'গজারিয়া',
-    village: r.village || '',
-    hasDonated: r.has_donated || 'হ্যাঁ',
-    lastDonationDate: r.last_donation_date || '',
-    donationCount: r.donation_count || 0,
-    verified: r.verified !== false,
-    status: r.status || 'active',
-    photo: r.photo || '',
-    isDemo: Boolean(r.is_demo)
-  };
-}
-
-function volunteerToRow(v) {
-  return {
-    id: v.id,
-    name: v.name,
-    father: v.father || '',
-    blood_group: v.bloodGroup || '',
-    dob: v.dob || '',
-    profession: v.profession || '',
-    phone: v.phone,
-    whatsapp: v.whatsapp || '',
-    upazila: v.upazila || 'গজারিয়া',
-    village: v.village || '',
-    interest: v.interest || '',
-    photo: v.photo || '',
-    status: v.status || 'active',
-    joined_date: v.joinedDate || ''
-  };
-}
-
-function rowToVolunteer(r) {
-  return {
-    id: r.id,
-    name: r.name,
-    father: r.father || '',
-    bloodGroup: r.blood_group || '',
-    dob: r.dob || '',
-    profession: r.profession || '',
-    phone: r.phone,
-    whatsapp: r.whatsapp || '',
-    upazila: r.upazila || 'গজারিয়া',
-    village: r.village || '',
-    interest: r.interest || '',
-    photo: r.photo || '',
-    status: r.status || 'active',
-    joinedDate: r.joined_date || ''
-  };
-}
-
-function requestToRow(req) {
-  return {
-    id: req.id,
-    patient_name: req.patientName,
-    blood_group: req.bloodGroup,
-    bags: req.bags || '1',
-    time: req.time || 'জরুরি',
-    hospital: req.hospital || '',
-    contact: req.contact || '',
-    phone: req.phone,
-    reason: req.reason || '',
-    urgency: req.urgency || 'জরুরি',
-    status: req.status || 'active',
-    managed_date: req.managedDate || '',
-    donor_name: req.donorName || '',
-    donor_phone: req.donorPhone || '',
-    notes: req.notes || ''
-  };
-}
-
-function rowToRequest(r) {
-  return {
-    id: r.id,
-    patientName: r.patient_name,
-    bloodGroup: r.blood_group,
-    bags: r.bags || '1',
-    time: r.time || 'জরুরি',
-    hospital: r.hospital || '',
-    contact: r.contact || '',
-    phone: r.phone,
-    reason: r.reason || '',
-    urgency: r.urgency || 'জরুরি',
-    status: r.status || 'active',
-    managedDate: r.managed_date || '',
-    donorName: r.donor_name || '',
-    donorPhone: r.donor_phone || '',
-    notes: r.notes || ''
-  };
-}
-
-function noticeToRow(n) {
-  return {
-    id: n.id,
-    title: n.title,
-    category: n.category,
-    date: n.date || '',
-    priority: n.priority || 'normal',
-    author: n.author || 'পরিচালনা পরিষদ',
-    signee_role: n.signeeRole || 'সভাপতি',
-    status: n.status || 'active',
-    summary: n.summary || '',
-    content: n.content || ''
-  };
-}
-
-function rowToNotice(r) {
-  return {
-    id: r.id,
-    title: r.title,
-    category: r.category,
-    date: r.date || '',
-    priority: r.priority || 'normal',
-    author: r.author || 'পরিচালনা পরিষদ',
-    signeeRole: r.signee_role || 'সভাপতি',
-    status: r.status || 'active',
-    summary: r.summary || '',
-    content: r.content || ''
-  };
-}
-
-function activityToRow(a) {
-  return {
-    id: a.id,
-    title: a.title,
-    category: a.category,
-    media_type: a.mediaType || 'image',
-    media_url: a.mediaUrl || '',
-    date: a.date || '',
-    location: a.location || '',
-    description: a.description || a.desc || ''
-  };
-}
-
-function rowToActivity(r) {
-  return {
-    id: r.id,
-    title: r.title,
-    category: r.category,
-    mediaType: r.media_type || 'image',
-    mediaUrl: r.media_url || '',
-    date: r.date || '',
-    location: r.location || '',
-    description: r.description || '',
-    desc: r.description || ''
-  };
-}
-
-function aidToRow(a) {
-  return {
-    id: a.id,
-    service_name: a.serviceName,
-    name: a.name,
-    phone: a.phone,
-    address: a.address || '',
-    details: a.details || '',
-    status: a.status || 'pending',
-    submitted_at: a.submittedAt || ''
-  };
-}
-
-function rowToAid(r) {
-  return {
-    id: r.id,
-    serviceName: r.service_name,
-    name: r.name,
-    phone: r.phone,
-    address: r.address || '',
-    details: r.details || '',
-    status: r.status || 'pending',
-    submittedAt: r.submitted_at || ''
-  };
-}
-
-function recordToRow(rec) {
-  return {
-    id: rec.id,
-    request_id: rec.requestId || '',
-    patient_name: rec.patientName || '',
-    patient_phone: rec.patientPhone || '',
-    hospital: rec.hospital || '',
-    blood_group: rec.bloodGroup || '',
-    bags: rec.bags || '1',
-    donor_name: rec.donorName || '',
-    donor_phone: rec.donorPhone || '',
-    donor_address: rec.donorAddress || '',
-    donation_date: rec.donationDate || '',
-    managed_date: rec.managedDate || '',
-    notes: rec.notes || '',
-    status: rec.status || 'managed'
-  };
-}
-
-function rowToRecord(r) {
-  return {
-    id: r.id,
-    requestId: r.request_id || '',
-    patientName: r.patient_name || '',
-    patientPhone: r.patient_phone || '',
-    hospital: r.hospital || '',
-    bloodGroup: r.blood_group || '',
-    bags: r.bags || '1',
-    donorName: r.donor_name || '',
-    donorPhone: r.donor_phone || '',
-    donorAddress: r.donor_address || '',
-    donationDate: r.donation_date || '',
-    managedDate: r.managed_date || '',
-    notes: r.notes || '',
-    status: r.status || 'managed'
-  };
-}
-
-// ==============================================================================
-// CLOUD FETCH & SYNCHRONIZATION
-// ==============================================================================
-
-async function syncAllFromSupabase(isManual = false) {
-  if (!isSupabaseReady()) return;
-  if (isSyncingFromCloud) return;
-  isSyncingFromCloud = true;
-
-  if (isManual && typeof Swal !== 'undefined') {
-    Swal.fire({
-      title: 'ক্লাউড ডেটা লোড হচ্ছে...',
-      text: 'Supabase থেকে সর্বশেষ তথ্য সিঙ্ক্রোনাইজ হচ্ছে',
-      allowOutsideClick: false,
-      didOpen: () => Swal.showLoading()
-    });
-  }
-
-  try {
-    const [
-      donorsRes,
-      volunteersRes,
-      requestsRes,
-      noticesRes,
-      activitiesRes,
-      aidRes,
-      recordsRes,
-      settingsRes
-    ] = await Promise.allSettled([
-      supabaseClient.from('donors').select('*'),
-      supabaseClient.from('volunteers').select('*'),
-      supabaseClient.from('emergency_requests').select('*').order('created_at', { ascending: false }),
-      supabaseClient.from('notices').select('*'),
-      supabaseClient.from('activities').select('*'),
-      supabaseClient.from('aid_applications').select('*').order('created_at', { ascending: false }),
-      supabaseClient.from('donation_records').select('*'),
-      supabaseClient.from('site_settings').select('*')
-    ]);
-
-    let dataChanged = false;
-
-    // 1. Donors
-    if (donorsRes.status === 'fulfilled' && donorsRes.value.data) {
-      if (donorsRes.value.data.length > 0) {
-        donors = donorsRes.value.data.map(rowToDonor);
-        localStorage.setItem(STORAGE_KEYS.DONORS, JSON.stringify(donors));
-        dataChanged = true;
-      } else {
-        // Cloud is empty -> auto seed default donors
-        cloudBulkUpsertDonors(INITIAL_DONORS);
-      }
-    }
-
-    // 2. Volunteers
-    if (volunteersRes.status === 'fulfilled' && volunteersRes.value.data) {
-      if (volunteersRes.value.data.length > 0) {
-        volunteers = volunteersRes.value.data.map(rowToVolunteer);
-        localStorage.setItem(STORAGE_KEYS.VOLUNTEERS, JSON.stringify(volunteers));
-        dataChanged = true;
-      } else {
-        cloudBulkUpsertVolunteers(INITIAL_VOLUNTEERS);
-      }
-    }
-
-    // 3. Emergency Requests
-    if (requestsRes.status === 'fulfilled' && requestsRes.value.data) {
-      emergencyRequests = requestsRes.value.data.map(rowToRequest);
-      localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(emergencyRequests));
-      dataChanged = true;
-    }
-
-    // 4. Notices
-    if (noticesRes.status === 'fulfilled' && noticesRes.value.data) {
-      if (noticesRes.value.data.length > 0) {
-        notices = noticesRes.value.data.map(rowToNotice);
-        localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(notices));
-        dataChanged = true;
-      } else {
-        cloudBulkUpsertNotices(INITIAL_NOTICES);
-      }
-    }
-
-    // 5. Activities
-    if (activitiesRes.status === 'fulfilled' && activitiesRes.value.data) {
-      if (activitiesRes.value.data.length > 0) {
-        activities = activitiesRes.value.data.map(rowToActivity);
-        localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
-        dataChanged = true;
-      } else {
-        cloudBulkUpsertActivities(INITIAL_ACTIVITIES);
-      }
-    }
-
-    // 6. Aid Applications
-    if (aidRes.status === 'fulfilled' && aidRes.value.data) {
-      aidApplications = aidRes.value.data.map(rowToAid);
-      localStorage.setItem(STORAGE_KEYS.AID, JSON.stringify(aidApplications));
-      dataChanged = true;
-    }
-
-    // 7. Donation Records
-    if (recordsRes.status === 'fulfilled' && recordsRes.value.data) {
-      if (recordsRes.value.data.length > 0) {
-        donationRecords = recordsRes.value.data.map(rowToRecord);
-        localStorage.setItem(STORAGE_KEYS.DONATION_RECORDS, JSON.stringify(donationRecords));
-      }
-    }
-
-    // 8. Site Settings
-    if (settingsRes.status === 'fulfilled' && settingsRes.value.data && settingsRes.value.data.length > 0) {
-      const row = settingsRes.value.data.find(s => s.key === 'general');
-      if (row && row.value) {
-        siteSettings = { ...DEFAULT_SETTINGS, ...row.value };
-        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(siteSettings));
-        applySiteSettings();
-      }
-    }
-
-    // Refresh UI
-    filterDonors();
-    renderVolunteersGrid();
-    renderEmergencyRequests();
-    renderNoticeBoard();
-    renderHomeNotices();
-    renderGallery('ALL');
-    updateHomeStats();
-    updateNoticeStats();
-    if (isAdminLoggedIn) {
-      updateAdminDashboard();
-      renderAdminTable();
-      renderAdminVolunteersTable();
-      renderAdminNoticeList();
-      renderAdminEmergencyList();
-      renderAdminAidList();
-      renderAdminGalleryGrid();
-    }
-    updateCloudStatusBadge(true);
-
-    if (isManual && typeof Swal !== 'undefined') {
-      Swal.fire({
-        icon: 'success',
-        title: 'ক্লাউড সিঙ্ক্রোনাইজেশন সম্পন্ন!',
-        text: 'সবশেষ লাইভ ডেটা সফলভাবে লোড হয়েছে।',
-        timer: 1500,
-        showConfirmButton: false
-      });
-    }
-  } catch(err) {
-    console.error('Error during Supabase sync:', err);
-    if (isManual && typeof Swal !== 'undefined') {
-      Swal.fire({ icon: 'error', title: 'সিঙ্ক ত্রুটি', text: err.message || 'ক্লাউড থেকে ডেটা আনা যায়নি।' });
-    }
-  } finally {
-    isSyncingFromCloud = false;
-  }
-}
-
-// ==============================================================================
-// REALTIME SUBSCRIPTION (অন্য ডিভাইসের পরিবর্তন তৎক্ষণাৎ ধরা)
-// ==============================================================================
-
-function setupSupabaseRealtime() {
-  if (!isSupabaseReady()) return;
-  if (realtimeChannel) {
-    try { supabaseClient.removeChannel(realtimeChannel); } catch(e){}
-  }
-
-  try {
-    realtimeChannel = supabaseClient
-      .channel('caf_portal_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'emergency_requests' }, payload => {
-        syncAllFromSupabase();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'donors' }, payload => {
-        syncAllFromSupabase();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'volunteers' }, payload => {
-        syncAllFromSupabase();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notices' }, payload => {
-        syncAllFromSupabase();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, payload => {
-        syncAllFromSupabase();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'aid_applications' }, payload => {
-        syncAllFromSupabase();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, payload => {
-        syncAllFromSupabase();
-      })
-      .subscribe();
-  } catch(e) {
-    console.warn('Realtime channel could not be established:', e);
-  }
-}
-
-// ==============================================================================
-// CLOUD MUTATION HELPERS (CREATE, UPDATE, DELETE TO SUPABASE)
-// ==============================================================================
-
-async function cloudUpsertDonor(donor) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('donors').upsert(donorToRow(donor));
-  } catch(e) { console.error('Cloud upsert donor error:', e); }
-}
-
-async function cloudBulkUpsertDonors(donorList) {
-  if (!isSupabaseReady() || !Array.isArray(donorList) || donorList.length === 0) return;
-  try {
-    const rows = donorList.map(donorToRow);
-    await supabaseClient.from('donors').upsert(rows);
-  } catch(e) { console.error('Cloud bulk upsert donors error:', e); }
-}
-
-async function cloudDeleteDonor(id) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('donors').delete().eq('id', id);
-  } catch(e) { console.error('Cloud delete donor error:', e); }
-}
-
-async function cloudUpsertVolunteer(vol) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('volunteers').upsert(volunteerToRow(vol));
-  } catch(e) { console.error('Cloud upsert volunteer error:', e); }
-}
-
-async function cloudBulkUpsertVolunteers(volList) {
-  if (!isSupabaseReady() || !Array.isArray(volList) || volList.length === 0) return;
-  try {
-    const rows = volList.map(volunteerToRow);
-    await supabaseClient.from('volunteers').upsert(rows);
-  } catch(e) { console.error('Cloud bulk upsert volunteers error:', e); }
-}
-
-async function cloudDeleteVolunteer(id) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('volunteers').delete().eq('id', id);
-  } catch(e) { console.error('Cloud delete volunteer error:', e); }
-}
-
-async function cloudUpsertRequest(req) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('emergency_requests').upsert(requestToRow(req));
-  } catch(e) { console.error('Cloud upsert request error:', e); }
-}
-
-async function cloudDeleteRequest(id) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('emergency_requests').delete().eq('id', id);
-  } catch(e) { console.error('Cloud delete request error:', e); }
-}
-
-async function cloudUpsertNotice(notice) {
-  if (!isSupabaseReady()) return { success: false, offline: true };
-  try {
-    const { error } = await supabaseClient.from('notices').upsert(noticeToRow(notice));
-    if (error) throw error;
-    return { success: true };
-  } catch(e) {
-    console.error('Cloud upsert notice error:', e);
-    return { success: false, error: e };
-  }
-}
-
-async function cloudBulkUpsertNotices(noticeList) {
-  if (!isSupabaseReady() || !Array.isArray(noticeList) || noticeList.length === 0) return { success: false, offline: true };
-  try {
-    const rows = noticeList.map(noticeToRow);
-    const { error } = await supabaseClient.from('notices').upsert(rows);
-    if (error) throw error;
-    return { success: true };
-  } catch(e) {
-    console.error('Cloud bulk upsert notices error:', e);
-    return { success: false, error: e };
-  }
-}
-
-async function cloudDeleteNotice(id) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('notices').delete().eq('id', id);
-  } catch(e) { console.error('Cloud delete notice error:', e); }
-}
-
-async function cloudUpsertActivity(act) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('activities').upsert(activityToRow(act));
-  } catch(e) { console.error('Cloud upsert activity error:', e); }
-}
-
-async function cloudBulkUpsertActivities(actList) {
-  if (!isSupabaseReady() || !Array.isArray(actList) || actList.length === 0) return;
-  try {
-    const rows = actList.map(activityToRow);
-    await supabaseClient.from('activities').upsert(rows);
-  } catch(e) { console.error('Cloud bulk upsert activities error:', e); }
-}
-
-async function cloudDeleteActivity(id) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('activities').delete().eq('id', id);
-  } catch(e) { console.error('Cloud delete activity error:', e); }
-}
-
-async function cloudUpsertAid(aid) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('aid_applications').upsert(aidToRow(aid));
-  } catch(e) { console.error('Cloud upsert aid error:', e); }
-}
-
-async function cloudBulkUpsertAid(aidList) {
-  if (!isSupabaseReady() || !Array.isArray(aidList) || aidList.length === 0) return;
-  try {
-    const rows = aidList.map(aidToRow);
-    await supabaseClient.from('aid_applications').upsert(rows);
-  } catch(e) { console.error('Cloud bulk upsert aid error:', e); }
-}
-
-async function cloudDeleteAid(id) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('aid_applications').delete().eq('id', id);
-  } catch(e) { console.error('Cloud delete aid error:', e); }
-}
-
-async function cloudUpsertRecord(rec) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('donation_records').upsert(recordToRow(rec));
-  } catch(e) { console.error('Cloud upsert record error:', e); }
-}
-
-async function cloudSaveSettings(settings) {
-  if (!isSupabaseReady()) return;
-  try {
-    await supabaseClient.from('site_settings').upsert({
-      key: 'general',
-      value: settings,
-      updated_at: new Date().toISOString()
-    });
-  } catch(e) { console.error('Cloud save settings error:', e); }
-}
-
-// ==============================================================================
-// ADMIN CLOUD CONTROL PANEL CONTROLLER
-// ==============================================================================
-
-function renderAdminCloudPanel() {
-  getSupabaseConfig();
-  const urlInput = document.getElementById('supabase-url-input');
-  const keyInput = document.getElementById('supabase-anon-key-input');
-
-  if (urlInput) urlInput.value = SUPABASE_CONFIG.url || '';
-  if (keyInput) keyInput.value = SUPABASE_CONFIG.anonKey || '';
-
-  updateCloudStatusBadge(isSupabaseReady());
-  updateCloudMetricsUI();
-}
-
-function toggleAnonKeyVisibility() {
-  const input = document.getElementById('supabase-anon-key-input');
-  const icon = document.getElementById('anon-key-eye-icon');
-  if (!input || !icon) return;
-
-  if (input.type === 'password') {
-    input.type = 'text';
-    icon.className = 'fa-solid fa-eye-slash';
-  } else {
-    input.type = 'password';
-    icon.className = 'fa-solid fa-eye';
-  }
-}
-
+// ============================================================
+// STANDALONE MODE — Cloud stubs (no external DB connection)
+// ============================================================
+function isFirebaseReady() { return false; }
+function isSupabaseReady() { return false; }
+function updateCloudStatusBadge(c, t) {}
+function updateCloudMetricsUI() {}
+async function cloudUpsertDonor() {}
+async function cloudBulkUpsertDonors() {}
+async function cloudDeleteDonor() {}
+async function cloudUpsertVolunteer() {}
+async function cloudBulkUpsertVolunteers() {}
+async function cloudDeleteVolunteer() {}
+async function cloudUpsertRequest() {}
+async function cloudDeleteRequest() {}
+async function cloudUpsertNotice() { return { success: false, offline: true }; }
+async function cloudBulkUpsertNotices() {}
+async function cloudDeleteNotice() {}
+async function cloudUpsertActivity() {}
+async function cloudBulkUpsertActivities() {}
+async function cloudDeleteActivity() {}
+async function cloudUpsertAid() {}
+async function cloudBulkUpsertAid() {}
+async function cloudDeleteAid() {}
+async function cloudUpsertRecord() {}
+async function cloudSaveSettings() {}
+async function syncAllFromSupabase() {}
+async function syncAllFromFirebase() {}
+function setupFirebaseRealtime() {}
+function setupSupabaseRealtime() {}
+function initFirebaseClient() { updateCloudStatusBadge(false, 'লোকাল মোড'); }
+function renderAdminCloudPanel() { updateCloudMetricsUI(); }
+function toggleAnonKeyVisibility() {}
 async function saveAndTestSupabaseConfig() {
-  const url = (document.getElementById('supabase-url-input')?.value || '').trim();
-  const anonKey = (document.getElementById('supabase-anon-key-input')?.value || '').trim();
-
-  if (!url || !anonKey) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'তথ্য অসম্পূর্ণ',
-      text: 'অনুগ্রহ করে Supabase Project URL এবং Anon / Public Key উভয়টি দিন।'
-    });
-    return;
-  }
-
-  if (!url.startsWith('https://')) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'ভুল URL ফরম্যাট',
-      text: 'Project URL অবশ্যই https:// দিয়ে শুরু হতে হবে (উদাঃ https://xyz.supabase.co)'
-    });
-    return;
-  }
-
-  Swal.fire({
-    title: 'সংযোগ পরীক্ষা করা হচ্ছে...',
-    text: 'Supabase সার্ভারের সাথে যোগাযোগ স্থাপন করা হচ্ছে',
-    allowOutsideClick: false,
-    didOpen: () => Swal.showLoading()
-  });
-
-  try {
-    if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
-      throw new Error('Supabase Client লাইব্রেরি লোড হয়নি। আপনার ইন্টারনেট সংযোগ পরীক্ষা করুন।');
-    }
-
-    const testClient = window.supabase.createClient(url, anonKey);
-    // Ping donors or site_settings table
-    const { data, error } = await testClient.from('donors').select('id').limit(1);
-
-    if (error && error.code !== 'PGRST116') {
-      throw new Error(error.message || 'Supabase টেবিলে সংযোগ করা সম্ভব হয়নি। SQL স্কিমা রান করেছেন কি?');
-    }
-
-    // Success -> persist config
-    SUPABASE_CONFIG = { url, anonKey, enabled: true };
-    localStorage.setItem(STORAGE_KEYS_CLOUD.SUPABASE_CONFIG, JSON.stringify(SUPABASE_CONFIG));
-    supabaseClient = testClient;
-
-    updateCloudStatusBadge(true, 'সংযুক্ত (Supabase Connected)');
-    setupSupabaseRealtime();
-    syncAllFromSupabase();
-
-    Swal.fire({
-      icon: 'success',
-      title: 'কানেকশন সফল!',
-      text: 'Supabase ক্লাউড ডেটাবেজ সফলভাবে সংযুক্ত হয়েছে। এখন সব ডিভাইসে ডেটা সিঙ্ক হবে।',
-      confirmButtonColor: '#0284c7'
-    });
-  } catch(err) {
-    console.error('Supabase test failed:', err);
-    Swal.fire({
-      icon: 'error',
-      title: 'কানেকশন ব্যর্থ হয়েছে',
-      text: err.message || 'সঠিক Project URL ও Anon Key দিয়েছেন কিনা এবং SQL স্কিমা রান করেছেন কিনা যাচাই করুন।'
-    });
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({ icon: 'info', title: 'লোকাল মোড', text: 'এই ওয়েবসাইটটি বর্তমানে লোকাল মোডে চলছে। ক্লাউড সংযোগ নেই।', confirmButtonColor: '#e11d48' });
   }
 }
-
 async function migrateAllDataToCloud() {
-  if (!isSupabaseReady()) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'ক্লাউড সংযুক্ত নয়',
-      text: 'প্রথমে Supabase Project URL ও Anon Key দিয়ে "কানেকশন টেস্ট ও সক্রিয় করুন" চাপুন।'
-    });
-    return;
-  }
-
-  const result = await Swal.fire({
-    title: 'লোকাল ডেটা ক্লাউডে আপলোড করতে চান?',
-    text: 'আপনার ব্রাউজারের সকল রক্তদাতা, স্বেচ্ছাসেবী, নোটিশ, ছবি ও সেটিংস Supabase ডেটাবেজে আপলোড করা হবে।',
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'হ্যাঁ, আপলোড করুন',
-    cancelButtonText: 'বাতিল',
-    confirmButtonColor: '#16a34a'
-  });
-
-  if (!result.isConfirmed) return;
-
-  Swal.fire({
-    title: 'ক্লাউডে আপলোড হচ্ছে...',
-    text: 'অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন',
-    allowOutsideClick: false,
-    didOpen: () => Swal.showLoading()
-  });
-
-  try {
-    await Promise.all([
-      cloudBulkUpsertDonors(donors),
-      cloudBulkUpsertVolunteers(volunteers),
-      cloudBulkUpsertNotices(notices),
-      cloudBulkUpsertActivities(activities),
-      cloudBulkUpsertAid(aidApplications),
-      cloudSaveSettings(siteSettings)
-    ]);
-
-    for (const req of emergencyRequests) {
-      await cloudUpsertRequest(req);
-    }
-    for (const rec of donationRecords) {
-      await cloudUpsertRecord(rec);
-    }
-
-    await syncAllFromSupabase();
-
-    Swal.fire({
-      icon: 'success',
-      title: 'আপলোড সফল হয়েছে!',
-      text: 'সকল ডেটা Supabase ক্লাউডে সংরক্ষিত হয়েছে। এখন অন্য যেকোনো মোবাইল বা কম্পিউটার থেকে ওয়েবসাইট খুললে সব ডেটা দেখা যাবে।',
-      confirmButtonColor: '#16a34a'
-    });
-  } catch(err) {
-    console.error('Migration failed:', err);
-    Swal.fire({
-      icon: 'error',
-      title: 'আপলোড ব্যর্থ হয়েছে',
-      text: err.message || 'ক্লাউডে ডেটা পাঠাতে সমস্যা হয়েছে।'
-    });
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({ icon: 'info', title: 'লোকাল মোড', text: 'ক্লাউড সংযোগ নেই।', confirmButtonColor: '#e11d48' });
   }
 }
-
-function showSqlSchemaModal() {
-  Swal.fire({
-    title: 'Supabase SQL স্কিমা কোড',
-    html: `
-      <div class="text-left text-xs space-y-2">
-        <p class="text-slate-600">এই SQL কোডটি কপি করে আপনার Supabase ড্যাশবোর্ডের <strong>SQL Editor</strong>-এ গিয়ে পেস্ট করে Run দিন:</p>
-        <textarea id="sql-schema-textarea" readonly class="w-full h-64 p-3 bg-slate-900 text-emerald-400 font-mono text-[11px] rounded-xl border border-slate-700 focus:outline-none">${EMBEDDED_SUPABASE_SCHEMA_SQL}</textarea>
-      </div>
-    `,
-    showCancelButton: true,
-    confirmButtonText: '<i class="fa-solid fa-copy mr-1"></i> কোড কপি করুন',
-    cancelButtonText: 'বন্ধ করুন',
-    confirmButtonColor: '#0284c7',
-    preConfirm: () => {
-      const ta = document.getElementById('sql-schema-textarea');
-      if (ta) {
-        ta.select();
-        navigator.clipboard.writeText(ta.value);
-        return true;
-      }
-    }
-  }).then(res => {
-    if (res.isConfirmed) {
-      Swal.fire({
-        icon: 'success',
-        title: 'কপি হয়েছে!',
-        text: 'SQL কোড ক্লিপবোর্ডে কপি করা হয়েছে। এখন Supabase SQL Editor-এ পেস্ট করুন।',
-        timer: 1500,
-        showConfirmButton: false
-      });
-    }
-  });
-}
+function donorToRow(d) { return d; }
+function rowToDonor(r) { return r; }
+function volunteerToRow(v) { return v; }
+function rowToVolunteer(r) { return r; }
+function requestToRow(req) { return req; }
+function rowToRequest(r) { return r; }
+function noticeToRow(n) { return n; }
+function rowToNotice(r) { return r; }
+function activityToRow(a) { return a; }
+function rowToActivity(r) { return r; }
+function aidToRow(a) { return a; }
+function rowToAid(r) { return r; }
+function recordToRow(rec) { return rec; }
+function rowToRecord(r) { return r; }

@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>চাঁদের আলো ফাউন্ডেশন | Chader Alo Foundation</title>
   <link rel="icon" type="image/png" href="assets/logo.png">
+  <meta name="description" content="চাঁদের আলো ফাউন্ডেশন — ব্লাড লিংক ও স্বেচ্ছাসেবী রক্তদান সেবা পোর্টাল। মুন্সীগঞ্জ ও সমগ্র বাংলাদেশের ২৪ ঘণ্টা রক্তদাতা অনুসন্ধান ও জরুরি রক্তের আবেদন।">
+  <meta name="theme-color" content="#1b8040">
+  <!-- Open Graph / Facebook / WhatsApp Preview -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="চাঁদের আলো ফাউন্ডেশন — Chader Alo Foundation">
+  <meta property="og:description" content="মুন্সীগঞ্জ ও সমগ্র বাংলাদেশের ২৪ ঘণ্টা রক্তদাতা অনুসন্ধান, অনলাইন রক্তদাতা ও স্বেচ্ছাসেবী নিবন্ধন এবং জরুরি রক্তদান সেবা পোর্টাল।">
+  <meta property="og:image" content="assets/logo.png">
   
   <!-- Google Fonts for Bengali - Hind Siliguri -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,10 +28,6 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
   <!-- Supabase JS Client CDN (ক্লাউড ডেটাবেজ সিঙ্ক্রোনাইজেশন) -->
-  <!-- Firebase App, Firestore & Auth SDKs (v10 compat) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   
   <!-- Custom Stylesheet -->
   <style id="inlined-chader-alo-style">
@@ -2822,7 +2825,7 @@ window.CAF_PHOTO_TREE_DATA_URI = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQA
                   <span class="text-[10px] text-emerald-400 font-normal ml-1">(কখনো Secret Key দেবেন না)</span>
                 </label>
                 <div class="relative">
-                  <input type="password" id="supabase-anon-key-input" value="AIzaSyCCPEnuQAqKWNoqfEumlaZpM-4Z-ZHZr3k" placeholder="AIzaSyCCPEnuQAqKWNoqfEumlaZpM-4Z-ZHZr3k" class="w-full bg-slate-950/90 border border-slate-700 rounded-xl pl-3.5 pr-10 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono">
+                  <input type="password" id="supabase-anon-key-input" value="" placeholder="" class="w-full bg-slate-950/90 border border-slate-700 rounded-xl pl-3.5 pr-10 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono">
                   <button type="button" onclick="toggleAnonKeyVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-white text-xs">
                     <i id="anon-key-eye-icon" class="fa-solid fa-eye"></i>
                   </button>
@@ -4687,20 +4690,6 @@ let activityUploadedPhoto = null;
 let editingActivityId = null;
 let aidApplications = [];
 
-// Firebase Cloud State
-var firebaseApp = null;
-var firestoreDb = null;
-var isSyncingFromCloud = false;
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCCPEnuQAqKWNoqfEumlaZpM-4Z-ZHZr3k",
-  authDomain: "chaderalofoundation-2df2e.firebaseapp.com",
-  projectId: "chaderalofoundation-2df2e",
-  storageBucket: "chaderalofoundation-2df2e.firebasestorage.app",
-  messagingSenderId: "1034370623909",
-  appId: "1:1034370623909:web:26d23deb7d31f2a607604c",
-  measurementId: "G-WSWG3XMJJE"
-};
-
 // Safe Swal fallback if offline or CDN blocked
 if (typeof Swal === 'undefined') {
   window.Swal = {
@@ -4822,9 +4811,6 @@ function initApp() {
   updateNoticeStats();
   renderAdminNoticeList();
   applyAdminUIState();
-  initFirebaseClient();
-  syncAllFromFirebase();
-  setupFirebaseRealtime();
 }
 
 if (document.readyState === 'loading') {
@@ -5053,18 +5039,15 @@ function loadData() {
 function saveDonors() {
   localStorage.setItem(STORAGE_KEYS.DONORS, JSON.stringify(donors));
   updateHomeStats();
-  if (isSupabaseReady()) cloudBulkUpsertDonors(donors);
 }
 
 function saveVolunteers() {
   localStorage.setItem(STORAGE_KEYS.VOLUNTEERS, JSON.stringify(volunteers));
   updateHomeStats();
-  if (isSupabaseReady()) cloudBulkUpsertVolunteers(volunteers);
 }
 
 function saveSettings() {
   localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(siteSettings));
-  if (isSupabaseReady()) cloudSaveSettings(siteSettings);
 }
 
 // -------------------------------------------------------------
@@ -5860,7 +5843,6 @@ function handleEmergencySubmit(e) {
   };
   emergencyRequests.unshift(newReq);
   localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(emergencyRequests));
-  if (typeof isSupabaseReady === 'function' && isSupabaseReady()) cloudUpsertRequest(newReq);
 
   document.getElementById('emergency-request-form').reset();
   renderEmergencyRequests();
@@ -5950,22 +5932,7 @@ function updateUrgentBanner() {
 // -------------------------------------------------------------
 async function checkAdminSession() {
   // First check Firebase Auth state
-  if (typeof firebase !== 'undefined' && firebase.auth) {
-    try {
-      const user = firebase.auth().currentUser;
-      if (user) {
-        isAdminLoggedIn = true;
-        sessionStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, 'true');
-        const gate = document.getElementById('admin-login-gate');
-        const dash = document.getElementById('admin-dashboard-view');
-        if (gate) gate.classList.add('hidden');
-        if (dash) dash.classList.remove('hidden');
-        updateAdminDashboard();
-        return;
-      }
-    } catch(e) {}
-  }
-  // Fallback: sessionStorage PIN session
+    // Fallback: sessionStorage PIN session
   if (sessionStorage.getItem(STORAGE_KEYS.ADMIN_AUTH) === 'true') {
     isAdminLoggedIn = true;
     const gate = document.getElementById('admin-login-gate');
@@ -6040,7 +6007,7 @@ function handleAdminTabClick() {
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
             ২৫৬-বিট সুরক্ষিত নিয়ন্ত্রণ ব্যবস্থা
           </div>
-          <p class="text-xs text-slate-300 font-bold mb-3">Supabase Auth দিয়ে লগইন: ইমেইল + পাসওয়ার্ড দিন। অথবা শুধু নিচে অফলাইন PIN দিন:</p>
+          <p class="text-xs text-slate-300 font-bold mb-3">নিচে অ্যাডমিন পিন কোড দিন:</p>
           <div class="relative max-w-xs mx-auto mb-2">
             <input type="email" id="swal-admin-email" 
                    class="w-full text-center text-sm bg-slate-800 text-slate-100 border border-slate-600 rounded-lg py-2 px-3 focus:outline-none focus:border-emerald-400 placeholder-slate-500" 
@@ -6088,20 +6055,7 @@ function handleAdminTabClick() {
           return false;
         }
         // If Firebase Auth is available and email provided:
-        if (typeof firebase !== 'undefined' && firebase.auth) {
-          const emailEl = document.getElementById('swal-admin-email');
-          const email = emailEl ? emailEl.value.trim() : '';
-          if (email) {
-            try {
-              await firebase.auth().signInWithEmailAndPassword(email, pin);
-              return true; // Firebase auth success
-            } catch(e) {
-              Swal.showValidationMessage('ইমেইল বা পাসওয়ার্ড ভুল! পুনরায় চেষ্টা করুন।');
-              return false;
-            }
-          }
-        }
-        // Fallback: local PIN check
+                // Fallback: local PIN check
         if (pin !== adminPin) {
           Swal.showValidationMessage('ভুল পিন কোড! সঠিক পিন দিন।');
           return false;
@@ -6135,10 +6089,7 @@ async function adminLogout() {
   isAdminLoggedIn = false;
   sessionStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
   // Sign out from Firebase Auth if connected
-  if (typeof firebase !== 'undefined' && firebase.auth) {
-    try { await firebase.auth().signOut(); } catch(e) {}
-  }
-  applyAdminUIState();
+    applyAdminUIState();
   const gate = document.getElementById('admin-login-gate');
   const dash = document.getElementById('admin-dashboard-view');
   if (gate) gate.classList.remove('hidden');
@@ -6269,7 +6220,6 @@ function adminMarkDonatedToday(id) {
 function adminDeleteDonor(id) {
   donors = donors.filter(x => x.id !== id);
   saveDonors();
-  if (typeof isSupabaseReady === 'function' && isSupabaseReady()) cloudDeleteDonor(id);
   updateAdminDashboard();
   filterDonors();
   Swal.fire('মুছে ফেলা হয়েছে', 'ডোনার তালিকা থেকে বাদ দেওয়া হয়েছে', 'success');
@@ -6565,12 +6515,10 @@ function toBengaliNumeral(n) {
 function saveActivities() {
   localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
   updateHomeStats();
-  if (isSupabaseReady()) cloudBulkUpsertActivities(activities);
 }
 
 function saveAidApplications() {
   localStorage.setItem(STORAGE_KEYS.AID, JSON.stringify(aidApplications));
-  if (isSupabaseReady()) cloudBulkUpsertAid(aidApplications);
 }
 
 // ============================================================
@@ -6857,7 +6805,6 @@ function adminDeleteActivity(actId) {
     if (res.isConfirmed) {
       activities = activities.filter(a => a.id !== actId);
       saveActivities();
-      if (typeof isSupabaseReady === 'function' && isSupabaseReady()) cloudDeleteActivity(actId);
       renderGallery('ALL');
       renderAdminGalleryGrid();
       Swal.fire({ icon: 'success', title: 'মুছে ফেলা হয়েছে!', timer: 1200, showConfirmButton: false });
@@ -7013,7 +6960,6 @@ function adminDeleteRequest(reqId) {
     if (res.isConfirmed) {
       emergencyRequests = emergencyRequests.filter(r => r.id !== reqId);
       localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(emergencyRequests));
-      if (typeof isSupabaseReady === 'function' && isSupabaseReady()) cloudDeleteRequest(reqId);
       renderAdminEmergencyList();
       renderEmergencyRequests();
       updateUrgentBanner();
@@ -7466,7 +7412,6 @@ function adminDeleteVolunteer(volId) {
     if (res.isConfirmed) {
       volunteers = volunteers.filter(x => x.id !== volId);
       saveVolunteers();
-      if (typeof isSupabaseReady === 'function' && isSupabaseReady()) cloudDeleteVolunteer(volId);
       renderAdminVolunteersTable();
       updateAdminDashboard();
       Swal.fire({ icon: 'success', title: 'মুছে ফেলা হয়েছে!', timer: 1200, showConfirmButton: false });
@@ -7900,10 +7845,6 @@ function handleBloodManagedSubmit(e) {
   donationRecords.unshift(record);
   saveDonationRecords();
   localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(emergencyRequests));
-  if (typeof isSupabaseReady === 'function' && isSupabaseReady()) {
-    cloudUpsertRequest(req);
-    cloudUpsertRecord(record);
-  }
 
   // 3. If donor is registered in donors list, update last donation date & count
   const regDonor = donors.find(d => d.phone === donorPhone || (donorName && d.name.toLowerCase() === donorName.toLowerCase()));
@@ -8046,9 +7987,6 @@ async function saveNotices() {
   renderHomeNotices();
   renderAdminNoticeList();
   updateNoticeStats();
-  if (isSupabaseReady()) {
-    try { await cloudBulkUpsertNotices(notices); } catch(e) { console.error('Notice cloud sync failed:', e); }
-  }
 }
 
 function updateNoticeStats() {
@@ -8376,41 +8314,12 @@ async function handleNoticeSubmit(e) {
   updateNoticeStats();
 
   closeNoticeEditModal();
-
-  // ক্লাউডে সংরক্ষণের চেষ্টা
-  if (isSupabaseReady() && targetNotice) {
-    const result = await cloudUpsertNotice(targetNotice);
-    if (result && result.success) {
-      Swal.fire({
-        icon: 'success',
-        title: editId ? 'নোটিশ সফলভাবে সংরক্ষিত হয়েছে!' : 'নতুন নোটিশ সফলভাবে প্রকাশিত হয়েছে!',
-        text: 'সব ডিভাইস ও ব্রাউজারে দেখা যাবে।',
-        confirmButtonColor: '#e11d48'
-      });
-    } else if (result && result.offline) {
-      Swal.fire({
-        icon: 'info',
-        title: editId ? 'নোটিশ স্থানীয়ভাবে সংরক্ষিত' : 'নোটিশ স্থানীয়ভাবে প্রকাশিত',
-        text: 'Supabase সংযোগ পাওয়া যাচ্ছে না। শুধু এই ডিভাইসে দেখা যাবে। অ্যাডমিন প্যানেলে Supabase Key সেট করুন।',
-        confirmButtonColor: '#e11d48'
-      });
-    } else {
-      Swal.fire({
-        icon: 'warning',
-        title: 'ক্লাউডে সংরক্ষণ ব্যর্থ!',
-        text: 'নোটিশ এই ডিভাইসে সংরক্ষিত হয়েছে, কিন্তু অন্য ডিভাইসে দেখা যাবে না। ইন্টারনেট সংযোগ ও Supabase সেটিং পরীক্ষা করুন।',
-        confirmButtonColor: '#e11d48'
-      });
-    }
-  } else {
-    // Supabase নেই — শুধু স্থানীয়
-    Swal.fire({
-      icon: 'success',
-      title: editId ? 'নোটিশ সংরক্ষিত হয়েছে!' : 'নোটিশ প্রকাশিত হয়েছে!',
-      text: 'Supabase সংযোগ নেই — শুধু এই ডিভাইসে দেখা যাবে।',
-      confirmButtonColor: '#e11d48'
-    });
-  }
+  // সফলভাবে সংরক্ষিত
+  Swal.fire({
+    icon: 'success',
+    title: editId ? 'নোটিশ সফলভাবে সংরক্ষিত হয়েছে!' : 'নতুন নোটিশ সফলভাবে প্রকাশিত হয়েছে!',
+    confirmButtonColor: '#e11d48'
+  });
 }
 
 function adminDeleteNotice(id) {
@@ -8426,7 +8335,6 @@ function adminDeleteNotice(id) {
     if (res.isConfirmed) {
       notices = notices.filter(n => n.id !== id);
       saveNotices();
-      if (typeof isSupabaseReady === 'function' && isSupabaseReady()) cloudDeleteNotice(id);
       Swal.fire({ icon: 'success', title: 'নোটিশ মুছে ফেলা হয়েছে!', timer: 1200, showConfirmButton: false });
     }
   });
@@ -8506,795 +8414,64 @@ function renderAdminNoticeList() {
 
 
 // ==============================================================================
-// FIREBASE CLOUD FIRESTORE & REALTIME SYNCHRONIZATION ENGINE
-// ==============================================================================
 
-function isFirebaseReady() {
-  return firestoreDb !== null;
-}
-
-// Compatibility alias for any leftover checks
-function isSupabaseReady() {
-  return isFirebaseReady();
-}
-
-function initFirebaseClient() {
-  if (typeof firebase === 'undefined') {
-    console.warn('Firebase SDK not loaded yet. Retrying...');
-    updateCloudStatusBadge(false, 'ফায়ারবেস SDK লোড হয়নি');
-    return null;
-  }
-  try {
-    if (!firebase.apps.length) {
-      firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
-    } else {
-      firebaseApp = firebase.app();
-    }
-    firestoreDb = firebase.firestore();
-    
-    // Enable offline cache if available
-    try {
-      firestoreDb.enablePersistence({ synchronizeTabs: true }).catch(() => {});
-    } catch(e) {}
-    
-    updateCloudStatusBadge(true, 'সংযুক্ত (Firebase Firestore Connected)');
-    return firestoreDb;
-  } catch(e) {
-    console.error('Failed to init Firebase:', e);
-    updateCloudStatusBadge(false, 'কানেকশন ত্রুটি');
-    return null;
-  }
-}
-
-function updateCloudStatusBadge(isConnected, customText = '') {
-  const badge = document.getElementById('cloud-status-badge');
-  if (!badge) return;
-
-  if (isConnected) {
-    badge.className = 'inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-sm';
-    badge.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600"></i> <span>${customText || 'ক্লাউড সক্রিয় (Firebase Realtime Sync)'}</span>`;
-  } else {
-    badge.className = 'inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-sm';
-    badge.innerHTML = `<i class="fa-solid fa-circle-exclamation text-amber-600 animate-pulse"></i> <span>${customText || 'লোকাল মোড'}</span>`;
-  }
-  updateCloudMetricsUI();
-}
-
-function updateCloudMetricsUI() {
-  const mDonors = document.getElementById('cloud-metric-donors');
-  const mVol = document.getElementById('cloud-metric-volunteers');
-  const mReq = document.getElementById('cloud-metric-requests');
-  const mNotices = document.getElementById('cloud-metric-notices');
-  const mActs = document.getElementById('cloud-metric-activities');
-  const mAid = document.getElementById('cloud-metric-aid');
-
-  if (mDonors) mDonors.textContent = toBengaliNumeral(donors.length);
-  if (mVol) mVol.textContent = toBengaliNumeral(volunteers.length);
-  if (mReq) mReq.textContent = toBengaliNumeral(emergencyRequests.length);
-  if (mNotices) mNotices.textContent = toBengaliNumeral(notices.length);
-  if (mActs) mActs.textContent = toBengaliNumeral(activities.length);
-  if (mAid) mAid.textContent = toBengaliNumeral(aidApplications.length);
-}
-
-// ------------------------------------------------------------------------------
-// DATA ROW CONVERTERS
-// ------------------------------------------------------------------------------
-function donorToRow(d) {
-  return {
-    id: d.id,
-    name: d.name,
-    father: d.father || '',
-    blood_group: d.bloodGroup,
-    dob: d.dob || '',
-    gender: d.gender || 'পুরুষ',
-    weight: d.weight ? Number(d.weight) : 0,
-    phone: d.phone,
-    whatsapp: d.whatsapp || '',
-    upazila: d.upazila || 'গজারিয়া',
-    village: d.village || '',
-    has_donated: d.hasDonated || 'হ্যাঁ',
-    last_donation_date: d.lastDonationDate || '',
-    donation_count: d.donationCount ? Number(d.donationCount) : 0,
-    verified: Boolean(d.verified),
-    status: d.status || 'active',
-    photo: d.photo || '',
-    is_demo: Boolean(d.isDemo)
-  };
-}
-
-function rowToDonor(r) {
-  return {
-    id: r.id,
-    name: r.name,
-    father: r.father || '',
-    bloodGroup: r.blood_group,
-    dob: r.dob || '',
-    gender: r.gender || 'পুরুষ',
-    weight: r.weight || 0,
-    phone: r.phone,
-    whatsapp: r.whatsapp || '',
-    upazila: r.upazila || 'গজারিয়া',
-    village: r.village || '',
-    hasDonated: r.has_donated || 'হ্যাঁ',
-    lastDonationDate: r.last_donation_date || '',
-    donationCount: r.donation_count || 0,
-    verified: r.verified !== false,
-    status: r.status || 'active',
-    photo: r.photo || '',
-    isDemo: Boolean(r.is_demo)
-  };
-}
-
-function volunteerToRow(v) {
-  return {
-    id: v.id,
-    name: v.name,
-    father: v.father || '',
-    blood_group: v.bloodGroup || '',
-    dob: v.dob || '',
-    profession: v.profession || '',
-    phone: v.phone,
-    whatsapp: v.whatsapp || '',
-    upazila: v.upazila || 'গজারিয়া',
-    village: v.village || '',
-    interest: v.interest || '',
-    photo: v.photo || '',
-    status: v.status || 'active',
-    joined_date: v.joinedDate || ''
-  };
-}
-
-function rowToVolunteer(r) {
-  return {
-    id: r.id,
-    name: r.name,
-    father: r.father || '',
-    bloodGroup: r.blood_group || '',
-    dob: r.dob || '',
-    profession: r.profession || '',
-    phone: r.phone,
-    whatsapp: r.whatsapp || '',
-    upazila: r.upazila || 'গজারিয়া',
-    village: r.village || '',
-    interest: r.interest || '',
-    photo: r.photo || '',
-    status: r.status || 'active',
-    joinedDate: r.joined_date || ''
-  };
-}
-
-function requestToRow(req) {
-  return {
-    id: req.id,
-    patient_name: req.patientName,
-    blood_group: req.bloodGroup,
-    bags: req.bags || '1',
-    time: req.time || 'জরুরি',
-    hospital: req.hospital || '',
-    contact: req.contact || '',
-    phone: req.phone,
-    reason: req.reason || '',
-    urgency: req.urgency || 'জরুরি',
-    status: req.status || 'active',
-    managed_date: req.managedDate || '',
-    donor_name: req.donorName || '',
-    donor_phone: req.donorPhone || '',
-    notes: req.notes || ''
-  };
-}
-
-function rowToRequest(r) {
-  return {
-    id: r.id,
-    patientName: r.patient_name,
-    bloodGroup: r.blood_group,
-    bags: r.bags || '1',
-    time: r.time || 'জরুরি',
-    hospital: r.hospital || '',
-    contact: r.contact || '',
-    phone: r.phone,
-    reason: r.reason || '',
-    urgency: r.urgency || 'জরুরি',
-    status: r.status || 'active',
-    managedDate: r.managed_date || '',
-    donorName: r.donor_name || '',
-    donorPhone: r.donor_phone || '',
-    notes: r.notes || ''
-  };
-}
-
-function noticeToRow(n) {
-  return {
-    id: n.id,
-    title: n.title,
-    category: n.category,
-    date: n.date || '',
-    priority: n.priority || 'normal',
-    author: n.author || 'পরিচালনা পরিষদ',
-    signee_role: n.signeeRole || 'সভাপতি',
-    status: n.status || 'active',
-    summary: n.summary || '',
-    content: n.content || ''
-  };
-}
-
-function rowToNotice(r) {
-  return {
-    id: r.id,
-    title: r.title,
-    category: r.category,
-    date: r.date || '',
-    priority: r.priority || 'normal',
-    author: r.author || 'পরিচালনা পরিষদ',
-    signeeRole: r.signee_role || 'সভাপতি',
-    status: r.status || 'active',
-    summary: r.summary || '',
-    content: r.content || ''
-  };
-}
-
-function activityToRow(a) {
-  return {
-    id: a.id,
-    title: a.title,
-    category: a.category,
-    media_type: a.mediaType || 'image',
-    media_url: a.mediaUrl || '',
-    date: a.date || '',
-    location: a.location || '',
-    description: a.description || a.desc || ''
-  };
-}
-
-function rowToActivity(r) {
-  return {
-    id: r.id,
-    title: r.title,
-    category: r.category,
-    mediaType: r.media_type || 'image',
-    mediaUrl: r.media_url || '',
-    date: r.date || '',
-    location: r.location || '',
-    description: r.description || '',
-    desc: r.description || ''
-  };
-}
-
-function aidToRow(a) {
-  return {
-    id: a.id,
-    service_name: a.serviceName,
-    name: a.name,
-    phone: a.phone,
-    address: a.address || '',
-    details: a.details || '',
-    status: a.status || 'pending',
-    submitted_at: a.submittedAt || ''
-  };
-}
-
-function rowToAid(r) {
-  return {
-    id: r.id,
-    serviceName: r.service_name,
-    name: r.name,
-    phone: r.phone,
-    address: r.address || '',
-    details: r.details || '',
-    status: r.status || 'pending',
-    submittedAt: r.submitted_at || ''
-  };
-}
-
-function recordToRow(rec) {
-  return {
-    id: rec.id,
-    request_id: rec.requestId || '',
-    patient_name: rec.patientName || '',
-    patient_phone: rec.patientPhone || '',
-    hospital: rec.hospital || '',
-    blood_group: rec.bloodGroup || '',
-    bags: rec.bags || '1',
-    donor_name: rec.donorName || '',
-    donor_phone: rec.donorPhone || '',
-    donor_address: rec.donorAddress || '',
-    donation_date: rec.donationDate || '',
-    managed_date: rec.managedDate || '',
-    notes: rec.notes || '',
-    status: rec.status || 'managed'
-  };
-}
-
-function rowToRecord(r) {
-  return {
-    id: r.id,
-    requestId: r.request_id || '',
-    patientName: r.patient_name || '',
-    patientPhone: r.patient_phone || '',
-    hospital: r.hospital || '',
-    bloodGroup: r.blood_group || '',
-    bags: r.bags || '1',
-    donorName: r.donor_name || '',
-    donorPhone: r.donor_phone || '',
-    donorAddress: r.donor_address || '',
-    donationDate: r.donation_date || '',
-    managedDate: r.managed_date || '',
-    notes: r.notes || '',
-    status: r.status || 'managed'
-  };
-}
-
-// ------------------------------------------------------------------------------
-// FIRESTORE CLOUD CRUD FUNCTIONS
-// ------------------------------------------------------------------------------
-async function cloudUpsertDonor(donor) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('donors').doc(donor.id).set(donorToRow(donor), { merge: true });
-  } catch(e) { console.error('Cloud upsert donor error:', e); }
-}
-
-async function cloudBulkUpsertDonors(donorList) {
-  if (!isFirebaseReady() || !Array.isArray(donorList) || donorList.length === 0) return;
-  try {
-    const batch = firestoreDb.batch();
-    donorList.forEach(d => {
-      const ref = firestoreDb.collection('donors').doc(d.id);
-      batch.set(ref, donorToRow(d), { merge: true });
-    });
-    await batch.commit();
-  } catch(e) { console.error('Cloud bulk upsert donors error:', e); }
-}
-
-async function cloudDeleteDonor(id) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('donors').doc(id).delete();
-  } catch(e) { console.error('Cloud delete donor error:', e); }
-}
-
-async function cloudUpsertVolunteer(vol) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('volunteers').doc(vol.id).set(volunteerToRow(vol), { merge: true });
-  } catch(e) { console.error('Cloud upsert volunteer error:', e); }
-}
-
-async function cloudBulkUpsertVolunteers(volList) {
-  if (!isFirebaseReady() || !Array.isArray(volList) || volList.length === 0) return;
-  try {
-    const batch = firestoreDb.batch();
-    volList.forEach(v => {
-      const ref = firestoreDb.collection('volunteers').doc(v.id);
-      batch.set(ref, volunteerToRow(v), { merge: true });
-    });
-    await batch.commit();
-  } catch(e) { console.error('Cloud bulk upsert volunteers error:', e); }
-}
-
-async function cloudDeleteVolunteer(id) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('volunteers').doc(id).delete();
-  } catch(e) { console.error('Cloud delete volunteer error:', e); }
-}
-
-async function cloudUpsertRequest(req) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('emergency_requests').doc(req.id).set(requestToRow(req), { merge: true });
-  } catch(e) { console.error('Cloud upsert request error:', e); }
-}
-
-async function cloudDeleteRequest(id) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('emergency_requests').doc(id).delete();
-  } catch(e) { console.error('Cloud delete request error:', e); }
-}
-
-async function cloudUpsertNotice(notice) {
-  if (!isFirebaseReady()) return { success: false, offline: true };
-  try {
-    await firestoreDb.collection('notices').doc(notice.id).set(noticeToRow(notice), { merge: true });
-    return { success: true };
-  } catch(e) {
-    console.error('Cloud upsert notice error:', e);
-    return { success: false, error: e };
-  }
-}
-
-async function cloudBulkUpsertNotices(noticeList) {
-  if (!isFirebaseReady() || !Array.isArray(noticeList) || noticeList.length === 0) return { success: false, offline: true };
-  try {
-    const batch = firestoreDb.batch();
-    noticeList.forEach(n => {
-      const ref = firestoreDb.collection('notices').doc(n.id);
-      batch.set(ref, noticeToRow(n), { merge: true });
-    });
-    await batch.commit();
-    return { success: true };
-  } catch(e) {
-    console.error('Cloud bulk upsert notices error:', e);
-    return { success: false, error: e };
-  }
-}
-
-async function cloudDeleteNotice(id) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('notices').doc(id).delete();
-  } catch(e) { console.error('Cloud delete notice error:', e); }
-}
-
-async function cloudUpsertActivity(act) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('activities').doc(act.id).set(activityToRow(act), { merge: true });
-  } catch(e) { console.error('Cloud upsert activity error:', e); }
-}
-
-async function cloudBulkUpsertActivities(actList) {
-  if (!isFirebaseReady() || !Array.isArray(actList) || actList.length === 0) return;
-  try {
-    const batch = firestoreDb.batch();
-    actList.forEach(a => {
-      const ref = firestoreDb.collection('activities').doc(a.id);
-      batch.set(ref, activityToRow(a), { merge: true });
-    });
-    await batch.commit();
-  } catch(e) { console.error('Cloud bulk upsert activities error:', e); }
-}
-
-async function cloudDeleteActivity(id) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('activities').doc(id).delete();
-  } catch(e) { console.error('Cloud delete activity error:', e); }
-}
-
-async function cloudUpsertAid(aid) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('aid_applications').doc(aid.id).set(aidToRow(aid), { merge: true });
-  } catch(e) { console.error('Cloud upsert aid error:', e); }
-}
-
-async function cloudBulkUpsertAid(aidList) {
-  if (!isFirebaseReady() || !Array.isArray(aidList) || aidList.length === 0) return;
-  try {
-    const batch = firestoreDb.batch();
-    aidList.forEach(a => {
-      const ref = firestoreDb.collection('aid_applications').doc(a.id);
-      batch.set(ref, aidToRow(a), { merge: true });
-    });
-    await batch.commit();
-  } catch(e) { console.error('Cloud bulk upsert aid error:', e); }
-}
-
-async function cloudDeleteAid(id) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('aid_applications').doc(id).delete();
-  } catch(e) { console.error('Cloud delete aid error:', e); }
-}
-
-async function cloudUpsertRecord(rec) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('donation_records').doc(rec.id).set(recordToRow(rec), { merge: true });
-  } catch(e) { console.error('Cloud upsert record error:', e); }
-}
-
-async function cloudSaveSettings(settings) {
-  if (!isFirebaseReady()) return;
-  try {
-    await firestoreDb.collection('site_settings').doc('general').set({
-      value: settings,
-      updated_at: new Date().toISOString()
-    }, { merge: true });
-  } catch(e) { console.error('Cloud save settings error:', e); }
-}
-
-// ------------------------------------------------------------------------------
-// FIRESTORE FULL DATA SYNCHRONIZATION
-// ------------------------------------------------------------------------------
-async function syncAllFromFirebase(isManual = false) {
-  if (!isFirebaseReady()) return;
-  if (isSyncingFromCloud) return;
-  isSyncingFromCloud = true;
-
-  if (isManual && typeof Swal !== 'undefined') {
-    Swal.fire({
-      title: 'ক্লাউড ডেটা লোড হচ্ছে...',
-      text: 'Firebase থেকে সর্বশেষ তথ্য সিঙ্ক্রোনাইজ হচ্ছে',
-      allowOutsideClick: false,
-      didOpen: () => Swal.showLoading()
-    });
-  }
-
-  try {
-    const [
-      donorsSnap,
-      volunteersSnap,
-      requestsSnap,
-      noticesSnap,
-      activitiesSnap,
-      aidSnap,
-      recordsSnap,
-      settingsSnap
-    ] = await Promise.all([
-      firestoreDb.collection('donors').get(),
-      firestoreDb.collection('volunteers').get(),
-      firestoreDb.collection('emergency_requests').get(),
-      firestoreDb.collection('notices').get(),
-      firestoreDb.collection('activities').get(),
-      firestoreDb.collection('aid_applications').get(),
-      firestoreDb.collection('donation_records').get(),
-      firestoreDb.collection('site_settings').doc('general').get()
-    ]);
-
-    let dataChanged = false;
-
-    // 1. Donors
-    if (!donorsSnap.empty) {
-      donors = donorsSnap.docs.map(doc => rowToDonor(doc.data()));
-      localStorage.setItem(STORAGE_KEYS.DONORS, JSON.stringify(donors));
-      dataChanged = true;
-    } else if (donors.length > 0) {
-      cloudBulkUpsertDonors(donors);
-    }
-
-    // 2. Volunteers
-    if (!volunteersSnap.empty) {
-      volunteers = volunteersSnap.docs.map(doc => rowToVolunteer(doc.data()));
-      localStorage.setItem(STORAGE_KEYS.VOLUNTEERS, JSON.stringify(volunteers));
-      dataChanged = true;
-    } else if (volunteers.length > 0) {
-      cloudBulkUpsertVolunteers(volunteers);
-    }
-
-    // 3. Emergency Requests
-    if (!requestsSnap.empty) {
-      emergencyRequests = requestsSnap.docs.map(doc => rowToRequest(doc.data()));
-      localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(emergencyRequests));
-      dataChanged = true;
-    }
-
-    // 4. Notices
-    if (!noticesSnap.empty) {
-      notices = noticesSnap.docs.map(doc => rowToNotice(doc.data()));
-      localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(notices));
-      dataChanged = true;
-    } else if (notices.length > 0) {
-      cloudBulkUpsertNotices(notices);
-    }
-
-    // 5. Activities
-    if (!activitiesSnap.empty) {
-      activities = activitiesSnap.docs.map(doc => rowToActivity(doc.data()));
-      localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
-      dataChanged = true;
-    } else if (activities.length > 0) {
-      cloudBulkUpsertActivities(activities);
-    }
-
-    // 6. Aid Applications
-    if (!aidSnap.empty) {
-      aidApplications = aidSnap.docs.map(doc => rowToAid(doc.data()));
-      localStorage.setItem(STORAGE_KEYS.AID, JSON.stringify(aidApplications));
-      dataChanged = true;
-    }
-
-    // 7. Donation Records
-    if (!recordsSnap.empty) {
-      donationRecords = recordsSnap.docs.map(doc => rowToRecord(doc.data()));
-      localStorage.setItem(STORAGE_KEYS.DONATION_RECORDS, JSON.stringify(donationRecords));
-      dataChanged = true;
-    }
-
-    // 8. Site Settings
-    if (settingsSnap.exists) {
-      const data = settingsSnap.data();
-      if (data && data.value) {
-        siteSettings = { ...DEFAULT_SETTINGS, ...data.value };
-        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(siteSettings));
-        applySiteSettings();
-      }
-    }
-
-    if (dataChanged) {
-      filterDonors();
-      renderVolunteersGrid();
-      renderEmergencyRequests();
-      renderNoticeBoard();
-      renderHomeNotices();
-      renderGallery('ALL');
-      updateHomeStats();
-      updateNoticeStats();
-      updateAdminDashboard();
-    }
-
-    updateCloudStatusBadge(true, 'সংযুক্ত (ডেটা সিঙ্ক সম্পন্ন)');
-    updateCloudMetricsUI();
-
-    if (isManual && typeof Swal !== 'undefined') {
-      Swal.fire({
-        icon: 'success',
-        title: 'সিঙ্ক সফল!',
-        text: 'Firebase থেকে সর্বশেষ ডেটা সফলভাবে হালনাগাদ করা হয়েছে।',
-        timer: 1500,
-        showConfirmButton: false
-      });
-    }
-  } catch(err) {
-    console.error('Firebase sync error:', err);
-    updateCloudStatusBadge(false, 'সিঙ্ক ত্রুটি');
-    if (isManual && typeof Swal !== 'undefined') {
-      Swal.fire({
-        icon: 'error',
-        title: 'সিঙ্ক ব্যর্থ হয়েছে',
-        text: err.message || 'ইন্টারনেট সংযোগ পরীক্ষা করুন।'
-      });
-    }
-  } finally {
-    isSyncingFromCloud = false;
-  }
-}
-
-// Backward-compatible alias
-async function syncAllFromSupabase(isManual = false) {
-  return syncAllFromFirebase(isManual);
-}
-
-// ------------------------------------------------------------------------------
-// FIRESTORE REALTIME LISTENERS
-// ------------------------------------------------------------------------------
-function setupFirebaseRealtime() {
-  if (!isFirebaseReady()) return;
-  try {
-    firestoreDb.collection('emergency_requests').onSnapshot(() => { syncAllFromFirebase(); }, () => {});
-    firestoreDb.collection('donors').onSnapshot(() => { syncAllFromFirebase(); }, () => {});
-    firestoreDb.collection('volunteers').onSnapshot(() => { syncAllFromFirebase(); }, () => {});
-    firestoreDb.collection('notices').onSnapshot(() => { syncAllFromFirebase(); }, () => {});
-    firestoreDb.collection('activities').onSnapshot(() => { syncAllFromFirebase(); }, () => {});
-    firestoreDb.collection('aid_applications').onSnapshot(() => { syncAllFromFirebase(); }, () => {});
-    firestoreDb.collection('donation_records').onSnapshot(() => { syncAllFromFirebase(); }, () => {});
-  } catch(e) {
-    console.warn('Realtime listener setup failed:', e);
-  }
-}
-
-// Backward-compatible alias
-function setupSupabaseRealtime() {
-  setupFirebaseRealtime();
-}
-
-// ------------------------------------------------------------------------------
-// ADMIN CLOUD PANEL (FIREBASE OVERVIEW & MANUAL ACTIONS)
-// ------------------------------------------------------------------------------
-function renderAdminCloudPanel() {
-  const urlInput = document.getElementById('supabase-url-input');
-  const keyInput = document.getElementById('supabase-anon-key-input');
-
-  if (urlInput) urlInput.value = FIREBASE_CONFIG.projectId;
-  if (keyInput) keyInput.value = FIREBASE_CONFIG.apiKey;
-
-  updateCloudStatusBadge(isFirebaseReady(), isFirebaseReady() ? 'Firebase সক্রিয় (রিয়েলটাইম সিঙ্ক)' : 'লোকাল মোড');
-  updateCloudMetricsUI();
-}
-
-function toggleAnonKeyVisibility() {
-  const input = document.getElementById('supabase-anon-key-input');
-  const icon = document.getElementById('anon-key-eye-icon');
-  if (!input || !icon) return;
-
-  if (input.type === 'password') {
-    input.type = 'text';
-    icon.className = 'fa-solid fa-eye-slash';
-  } else {
-    input.type = 'password';
-    icon.className = 'fa-solid fa-eye';
-  }
-}
-
+// ============================================================
+// STANDALONE MODE — Cloud stubs (no external DB connection)
+// ============================================================
+function isFirebaseReady() { return false; }
+function isSupabaseReady() { return false; }
+function updateCloudStatusBadge(c, t) {}
+function updateCloudMetricsUI() {}
+async function cloudUpsertDonor() {}
+async function cloudBulkUpsertDonors() {}
+async function cloudDeleteDonor() {}
+async function cloudUpsertVolunteer() {}
+async function cloudBulkUpsertVolunteers() {}
+async function cloudDeleteVolunteer() {}
+async function cloudUpsertRequest() {}
+async function cloudDeleteRequest() {}
+async function cloudUpsertNotice() { return { success: false, offline: true }; }
+async function cloudBulkUpsertNotices() {}
+async function cloudDeleteNotice() {}
+async function cloudUpsertActivity() {}
+async function cloudBulkUpsertActivities() {}
+async function cloudDeleteActivity() {}
+async function cloudUpsertAid() {}
+async function cloudBulkUpsertAid() {}
+async function cloudDeleteAid() {}
+async function cloudUpsertRecord() {}
+async function cloudSaveSettings() {}
+async function syncAllFromSupabase() {}
+async function syncAllFromFirebase() {}
+function setupFirebaseRealtime() {}
+function setupSupabaseRealtime() {}
+function initFirebaseClient() { updateCloudStatusBadge(false, 'লোকাল মোড'); }
+function renderAdminCloudPanel() { updateCloudMetricsUI(); }
+function toggleAnonKeyVisibility() {}
 async function saveAndTestSupabaseConfig() {
-  Swal.fire({
-    title: 'Firebase পরীক্ষা করা হচ্ছে...',
-    text: 'Firebase সার্ভারের সাথে যোগাযোগ স্থাপন করা হচ্ছে',
-    allowOutsideClick: false,
-    didOpen: () => Swal.showLoading()
-  });
-
-  try {
-    initFirebaseClient();
-    if (!isFirebaseReady()) throw new Error('Firebase ইনিশিয়ালাইজ করা সম্ভব হয়নি।');
-    await firestoreDb.collection('site_settings').doc('general').set({ ping: true, time: new Date().toISOString() }, { merge: true });
-    updateCloudStatusBadge(true, 'সংযুক্ত (Firebase Firestore Connected)');
-    await syncAllFromFirebase(false);
-
-    Swal.fire({
-      icon: 'success',
-      title: 'কানেকশন সফল!',
-      text: 'Firebase ক্লাউড ডেটাবেজ সফলভাবে সংযুক্ত হয়েছে। এখন সব ডিভাইসে ডেটা সিঙ্ক হবে।',
-      confirmButtonColor: '#0284c7'
-    });
-  } catch(err) {
-    console.error('Firebase test failed:', err);
-    Swal.fire({
-      icon: 'error',
-      title: 'কানেকশন ব্যর্থ হয়েছে',
-      text: err.message || 'ইন্টারনেট সংযোগ পরীক্ষা করুন।'
-    });
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({ icon: 'info', title: 'লোকাল মোড', text: 'এই ওয়েবসাইটটি বর্তমানে লোকাল মোডে চলছে। ক্লাউড সংযোগ নেই।', confirmButtonColor: '#e11d48' });
   }
 }
-
 async function migrateAllDataToCloud() {
-  if (!isFirebaseReady()) {
-    initFirebaseClient();
-    if (!isFirebaseReady()) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'ক্লাউড সংযুক্ত নয়',
-        text: 'Firebase ডেটাবেজ লোড হয়নি। ইন্টারনেট সংযোগ পরীক্ষা করুন।'
-      });
-      return;
-    }
-  }
-
-  const result = await Swal.fire({
-    title: 'লোকাল ডেটা ক্লাউডে আপলোড করতে চান?',
-    text: 'আপনার ব্রাউজারের সকল রক্তদাতা, স্বেচ্ছাসেবী, নোটিশ, ছবি ও সেটিংস Firebase ক্লাউডে আপলোড করা হবে।',
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'হ্যাঁ, আপলোড করুন',
-    cancelButtonText: 'বাতিল',
-    confirmButtonColor: '#16a34a'
-  });
-
-  if (!result.isConfirmed) return;
-
-  Swal.fire({
-    title: 'ক্লাউডে আপলোড হচ্ছে...',
-    text: 'অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন',
-    allowOutsideClick: false,
-    didOpen: () => Swal.showLoading()
-  });
-
-  try {
-    await Promise.all([
-      cloudBulkUpsertDonors(donors),
-      cloudBulkUpsertVolunteers(volunteers),
-      cloudBulkUpsertNotices(notices),
-      cloudBulkUpsertActivities(activities),
-      cloudBulkUpsertAid(aidApplications),
-      cloudSaveSettings(siteSettings)
-    ]);
-
-    for (const req of emergencyRequests) {
-      await cloudUpsertRequest(req);
-    }
-    for (const rec of donationRecords) {
-      await cloudUpsertRecord(rec);
-    }
-
-    await syncAllFromFirebase();
-
-    Swal.fire({
-      icon: 'success',
-      title: 'আপলোড সফল হয়েছে!',
-      text: 'সকল ডেটা Firebase ক্লাউডে সংরক্ষিত হয়েছে। এখন অন্য যেকোনো মোবাইল বা কম্পিউটার থেকে ওয়েবসাইট খুললে একই ডেটা দেখা যাবে।',
-      confirmButtonColor: '#0284c7'
-    });
-  } catch(err) {
-    console.error('Data migration failed:', err);
-    Swal.fire({
-      icon: 'error',
-      title: 'আপলোড ব্যর্থ হয়েছে',
-      text: err.message || 'ক্লাউডে ডেটা পাঠাতে সমস্যা হয়েছে।'
-    });
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({ icon: 'info', title: 'লোকাল মোড', text: 'ক্লাউড সংযোগ নেই।', confirmButtonColor: '#e11d48' });
   }
 }
+function donorToRow(d) { return d; }
+function rowToDonor(r) { return r; }
+function volunteerToRow(v) { return v; }
+function rowToVolunteer(r) { return r; }
+function requestToRow(req) { return req; }
+function rowToRequest(r) { return r; }
+function noticeToRow(n) { return n; }
+function rowToNotice(r) { return r; }
+function activityToRow(a) { return a; }
+function rowToActivity(r) { return r; }
+function aidToRow(a) { return a; }
+function rowToAid(r) { return r; }
+function recordToRow(rec) { return rec; }
+function rowToRecord(r) { return r; }
 
 </script>
 
